@@ -1,0 +1,17 @@
+title Find Guest by ID
+actor user
+user -> app: find guest by id
+database redis
+app -> redis: get guest cache by cache key
+app <- redis: guest cache
+alt if any guest cache
+user <- app: find guest by id response
+end
+database postgre
+app -> postgre: find guest by id
+app <- postgre: existing guest data
+alt if any guest data
+app -> redis: set guest cache
+app <- redis: guest cache created
+end
+user <- app: find guest by id response

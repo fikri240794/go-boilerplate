@@ -1,0 +1,21 @@
+title Update Guest by ID
+actor user
+user -> app: update guest by id
+database postgre
+app -> postgre: find guest by id
+app <- postgre: existing guest data
+app -> app: map the changes\nto existing guest data
+app -> postgre: update guest by id
+app <- postgre: existing guest updated
+database redis
+app -> redis: delete caches
+app <- redis: caches deleted
+app -> NSQ: publish updated existing guest data
+app <- NSQ: updated existing guest data published
+user <- app: updated guest by id response
+group background async process
+NSQ -> app: send updated existing guest data
+app -> webhook.site: send updated existing guest data via http request
+app <- webhook.site: http response
+NSQ <- app: process response
+end

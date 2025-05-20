@@ -1,0 +1,18 @@
+title Create Guest
+actor user
+user -> app: create guest
+database postgre
+app -> postgre: insert guest
+app <- postgre:  guest inserted
+database redis
+app -> redis: delete caches
+app <- redis: caches deleted
+app -> NSQ: publish created guest
+app <- NSQ: created guest published
+user <- app: created guest response
+group background async process
+NSQ -> app: send created guest data
+app -> webhook.site: send created guest data via http request
+app <- webhook.site: http response
+NSQ <- app: process  response
+end

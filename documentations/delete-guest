@@ -1,0 +1,21 @@
+title Delete Guest by ID
+actor user
+user -> app: delete guest by id
+database postgre
+app -> postgre: find guest by id
+app <- postgre: existing guest data
+app -> app: mark as deleted\nto existing guest data
+app -> postgre: update guest by id (soft-delete)
+app <- postgre: existing guest updated (soft-deleted)
+database redis
+app -> redis: delete caches
+app <- redis: caches deleted
+app -> NSQ: publish soft-deleted existing guest data
+app <- NSQ: soft-deleted existing guest data published
+user <- app: deleted guest by id response
+group background async process
+NSQ -> app: send soft-deleted existing guest data
+app -> webhook.site: send soft-deleted existing guest data via http request
+app <- webhook.site: http response
+NSQ <- app: process response
+end

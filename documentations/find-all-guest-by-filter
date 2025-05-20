@@ -1,0 +1,17 @@
+title Find All Guest by Filter
+actor user
+user -> app: find all guest by filter
+database redis
+app -> redis: get guests cache by cache key
+app <- redis: guests cache
+alt if any guests cache
+user <- app: find all guest by filter response
+end
+database postgre
+app -> postgre: find all guest by filter
+app <- postgre: filtered guests data
+alt if any filtered guests data
+app -> redis: set guests cache
+app <- redis: guests cache created
+end
+user <- app: find all guest by filter response
