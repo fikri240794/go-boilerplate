@@ -2,7 +2,7 @@ package context
 
 import "context"
 
-func SafeCtxValue[T interface{}](ctx context.Context, key interface{}) T {
+func GetCtxValueSafely[T interface{}](ctx context.Context, key interface{}) T {
 	var (
 		emptyResult *T
 		rawCtxValue interface{}

@@ -56,49 +56,50 @@ func NewFindAllGuestRequestDTO() *FindAllGuestRequestDTO {
 		Take: 10,
 	}
 }
-func (dto *FindAllGuestRequestDTO) ToFilterAndSorts() (*goqube.Filter, []*goqube.Sort, error) {
+func (dto *FindAllGuestRequestDTO) ToFilterAndSorts() (*goqube.Filter, []goqube.Sort, error) {
 	var (
 		filter         *goqube.Filter
 		splittedString []string
-		sorts          []*goqube.Sort
+		sorts          []goqube.Sort
 		err            error
 	)
 
-	filter = goqube.NewFilter().
-		SetLogic(goqube.LogicAnd).
-		AddFilter(
-			goqube.NewField(entities.GuestEntityDatabaseFieldDeletedAt),
-			goqube.OperatorIsNull,
-			nil,
-		)
+	filter = &goqube.Filter{
+		Logic: goqube.LogicAnd,
+		Filters: []goqube.Filter{
+			{
+				Field:    goqube.Field{Column: entities.GuestEntityDatabaseFieldDeletedAt},
+				Operator: goqube.OperatorIsNull,
+				Value:    goqube.FilterValue{Value: nil},
+			},
+		},
+	}
 
 	if dto.Keyword != "" {
-		filter = filter.AddFilters(
-			goqube.NewFilter().
-				SetLogic(goqube.LogicOr).
-				AddFilter(
-					goqube.NewField(entities.GuestEntityDatabaseFieldName),
-					goqube.OperatorLike,
-					goqube.NewFilterValue(dto.Keyword),
-				).
-				AddFilter(
-					goqube.NewField(entities.GuestEntityDatabaseFieldAddress),
-					goqube.OperatorLike,
-					goqube.NewFilterValue(dto.Keyword),
-				),
-		)
+		filter.Filters = append(filter.Filters, goqube.Filter{
+			Logic: goqube.LogicOr,
+			Filters: []goqube.Filter{
+				{
+					Field:    goqube.Field{Column: entities.GuestEntityDatabaseFieldName},
+					Operator: goqube.OperatorLike,
+					Value:    goqube.FilterValue{Value: dto.Keyword},
+				},
+				{
+					Field:    goqube.Field{Column: entities.GuestEntityDatabaseFieldAddress},
+					Operator: goqube.OperatorLike,
+					Value:    goqube.FilterValue{Value: dto.Keyword},
+				},
+			},
+		})
 	}
 
 	if dto.Sorts != "" {
 		splittedString = strings.Split(dto.Sorts, ",")
 		if len(splittedString) <= 0 {
-			sorts = append(
-				sorts,
-				goqube.NewSort(
-					goqube.NewField(entities.GuestEntityDatabaseFieldName),
-					goqube.SortDirectionAscending,
-				),
-			)
+			sorts = append(sorts, goqube.Sort{
+				Field:     goqube.Field{Column: entities.GuestEntityDatabaseFieldName},
+				Direction: goqube.SortDirectionAscending,
+			})
 		}
 	}
 
@@ -123,13 +124,11 @@ func (dto *FindAllGuestRequestDTO) ToFilterAndSorts() (*goqube.Filter, []*goqube
 				)
 				return nil, nil, err
 			}
-			sorts = append(
-				sorts,
-				goqube.NewSort(
-					goqube.NewField(sortFieldAndDirection[0]),
-					goqube.SortDirectionAscending,
-				),
-			)
+
+			sorts = append(sorts, goqube.Sort{
+				Field:     goqube.Field{Column: sortFieldAndDirection[0]},
+				Direction: goqube.SortDirectionAscending,
+			})
 		}
 
 		if len(sortFieldAndDirection) >= 2 {
@@ -153,13 +152,10 @@ func (dto *FindAllGuestRequestDTO) ToFilterAndSorts() (*goqube.Filter, []*goqube
 				return nil, nil, err
 			}
 
-			sorts = append(
-				sorts,
-				goqube.NewSort(
-					goqube.NewField(sortFieldAndDirection[0]),
-					goqube.SortDirection(sortFieldAndDirection[1]),
-				),
-			)
+			sorts = append(sorts, goqube.Sort{
+				Field:     goqube.Field{Column: sortFieldAndDirection[0]},
+				Direction: goqube.SortDirection(sortFieldAndDirection[1]),
+			})
 		}
 	}
 

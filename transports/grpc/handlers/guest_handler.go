@@ -40,7 +40,7 @@ func (h *ImplementedBoilerplateServer) CreateGuest(ctx context.Context, requestV
 	}
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
+		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"requestVM": requestVM,
 	}
 
@@ -58,7 +58,7 @@ func (h *ImplementedBoilerplateServer) CreateGuest(ctx context.Context, requestV
 		log.WithLevel(logLevel).
 			Ctx(ctx).
 			Err(err).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[ImplementedBoilerplateServer][CreateGuest][Create] failed to create")
 		log.Debug().
 			Ctx(ctx).
@@ -90,7 +90,7 @@ func (h *ImplementedBoilerplateServer) DeleteGuestByID(ctx context.Context, requ
 	}
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
+		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"requestVM": requestVM,
 	}
 
@@ -108,7 +108,7 @@ func (h *ImplementedBoilerplateServer) DeleteGuestByID(ctx context.Context, requ
 		log.WithLevel(logLevel).
 			Ctx(ctx).
 			Err(err).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[ImplementedBoilerplateServer][DeleteGuestByID][DeleteByID] failed to delete by id")
 		log.Debug().
 			Ctx(ctx).
@@ -136,7 +136,7 @@ func (h *ImplementedBoilerplateServer) FindAllGuest(ctx context.Context, request
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
+		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"requestVM": requestVM,
 	}
 
@@ -157,7 +157,7 @@ func (h *ImplementedBoilerplateServer) FindAllGuest(ctx context.Context, request
 		log.WithLevel(logLevel).
 			Ctx(ctx).
 			Err(err).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[ImplementedBoilerplateServer][FindAllGuest][FindAll] failed to find all")
 		log.Debug().
 			Ctx(ctx).
@@ -191,7 +191,7 @@ func (h *ImplementedBoilerplateServer) FindGuestByID(ctx context.Context, reques
 	}
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
+		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"requestVM": requestVM,
 	}
 
@@ -209,7 +209,7 @@ func (h *ImplementedBoilerplateServer) FindGuestByID(ctx context.Context, reques
 		log.WithLevel(logLevel).
 			Ctx(ctx).
 			Err(err).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[ImplementedBoilerplateServer][FindGuestByID][FindByID] failed to find by id")
 		log.Debug().
 			Ctx(ctx).
@@ -243,7 +243,7 @@ func (h *ImplementedBoilerplateServer) UpdateGuestByID(ctx context.Context, requ
 	}
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
+		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"requestVM": requestVM,
 	}
 
@@ -261,7 +261,7 @@ func (h *ImplementedBoilerplateServer) UpdateGuestByID(ctx context.Context, requ
 		log.WithLevel(logLevel).
 			Ctx(ctx).
 			Err(err).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[ImplementedBoilerplateServer][UpdateGuestByID][UpdateByID] failed to update by id")
 		log.Debug().
 			Ctx(ctx).

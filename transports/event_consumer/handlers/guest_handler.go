@@ -40,7 +40,7 @@ func (h *GuestHandler) HandleCreated(ctx context.Context, m *nsq.Message) error 
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid":   custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
+		"requestid":   custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"messageBody": string(m.Body),
 	}
 
@@ -54,7 +54,7 @@ func (h *GuestHandler) HandleCreated(ctx context.Context, m *nsq.Message) error 
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[GuestHandler][HandleCreated][Unmarshal] failed to parse message body")
 		log.Debug().
 			Ctx(ctx).
@@ -70,7 +70,7 @@ func (h *GuestHandler) HandleCreated(ctx context.Context, m *nsq.Message) error 
 		err = gocerr.New(http.StatusInternalServerError, "message is nil")
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[GuestHandler][HandleCreated] message is nil")
 		log.Debug().
 			Ctx(ctx).
@@ -87,7 +87,7 @@ func (h *GuestHandler) HandleCreated(ctx context.Context, m *nsq.Message) error 
 		logFields["requestDTO"] = requestDTO
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[GuestHandler][HandleCreated][ProcessEvent] failed to process event")
 		log.Debug().
 			Ctx(ctx).
@@ -113,7 +113,7 @@ func (h *GuestHandler) HandleDeleted(ctx context.Context, m *nsq.Message) error 
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid":   custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
+		"requestid":   custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"messageBody": string(m.Body),
 	}
 
@@ -127,7 +127,7 @@ func (h *GuestHandler) HandleDeleted(ctx context.Context, m *nsq.Message) error 
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[GuestHandler][HandleDeleted][Unmarshal] failed to parse message body")
 		log.Debug().
 			Ctx(ctx).
@@ -143,7 +143,7 @@ func (h *GuestHandler) HandleDeleted(ctx context.Context, m *nsq.Message) error 
 		err = gocerr.New(http.StatusInternalServerError, "message is nil")
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[GuestHandler][HandleDeleted] message is nil")
 		log.Debug().
 			Ctx(ctx).
@@ -160,7 +160,7 @@ func (h *GuestHandler) HandleDeleted(ctx context.Context, m *nsq.Message) error 
 		logFields["requestDTO"] = requestDTO
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[GuestHandler][HandleDeleted][ProcessEvent] failed to process event")
 		log.Debug().
 			Ctx(ctx).
@@ -182,7 +182,7 @@ func (h *GuestHandler) HandleUpdated(ctx context.Context, m *nsq.Message) error 
 	)
 
 	logFields = map[string]interface{}{
-		"requestid":   custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
+		"requestid":   custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"messageBody": string(m.Body),
 	}
 
@@ -196,7 +196,7 @@ func (h *GuestHandler) HandleUpdated(ctx context.Context, m *nsq.Message) error 
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[GuestHandler][HandleUpdated][Unmarshal] failed to parse message body")
 		log.Debug().
 			Ctx(ctx).
@@ -212,7 +212,7 @@ func (h *GuestHandler) HandleUpdated(ctx context.Context, m *nsq.Message) error 
 		err = gocerr.New(http.StatusInternalServerError, "message is nil")
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[GuestHandler][HandleUpdated] message is nil")
 		log.Debug().
 			Ctx(ctx).
@@ -229,7 +229,7 @@ func (h *GuestHandler) HandleUpdated(ctx context.Context, m *nsq.Message) error 
 		logFields["requestDTO"] = requestDTO
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[GuestHandler][HandleUpdated][ProcessEvent] failed to process event")
 		log.Debug().
 			Ctx(ctx).

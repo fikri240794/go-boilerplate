@@ -59,7 +59,7 @@ func (mw *LogMiddleware) Log(
 	}
 
 	logFields = map[string]interface{}{
-		"requestid":         custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
+		"requestid":         custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"req":               req,
 		"unary server info": info,
 		"res":               res,

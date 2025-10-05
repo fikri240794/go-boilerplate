@@ -56,7 +56,7 @@ func (r *WebhookSiteRepository) SendWebhook(ctx context.Context, requestData *en
 	otel.GetTextMapPropagator().Inject(ctx, propagation.MapCarrier(httpRequestHeaders))
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
+		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"url": fmt.Sprintf(
 			"%s%s",
 			r.cfg.Datasource.WebhookSiteHTTPClient.BaseURL,
@@ -80,7 +80,7 @@ func (r *WebhookSiteRepository) SendWebhook(ctx context.Context, requestData *en
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[WebhookSiteRepository][SendWebhook][Post] failed to request http")
 		log.Debug().
 			Ctx(ctx).
@@ -113,7 +113,7 @@ func (r *WebhookSiteRepository) SendWebhook(ctx context.Context, requestData *en
 		log.WithLevel(logLevel).
 			Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msgf("[WebhookSiteRepository][SendWebhook] http response is not success")
 		log.Debug().
 			Ctx(ctx).

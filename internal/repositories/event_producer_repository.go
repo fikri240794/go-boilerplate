@@ -59,7 +59,7 @@ func (r *EventProducerRepository[TEntity]) Publish(
 	ctx, message = message.InjectTracerPropagator(ctx)
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
+		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"topic":     topic,
 		"message":   message,
 	}
@@ -68,7 +68,7 @@ func (r *EventProducerRepository[TEntity]) Publish(
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[EventProducerRepository][Publish][Marshal] failed to marshal message")
 		log.Debug().
 			Ctx(ctx).
@@ -88,7 +88,7 @@ func (r *EventProducerRepository[TEntity]) Publish(
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[EventProducerRepository][Publish][Publish] failed to publish message")
 		log.Debug().
 			Ctx(ctx).
@@ -126,7 +126,7 @@ func (r *EventProducerRepository[TEntity]) PublishWithDelay(
 	ctx, message = message.InjectTracerPropagator(ctx)
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
+		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"topic":     topic,
 		"delay":     delay,
 		"message":   message,
@@ -136,7 +136,7 @@ func (r *EventProducerRepository[TEntity]) PublishWithDelay(
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[EventProducerRepository][PublishWithDelay][Marshal] failed to marshal message")
 		log.Debug().
 			Ctx(ctx).
@@ -156,7 +156,7 @@ func (r *EventProducerRepository[TEntity]) PublishWithDelay(
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[EventProducerRepository][PublishWithDelay][DeferredPublish] failed to publish message")
 		log.Debug().
 			Ctx(ctx).

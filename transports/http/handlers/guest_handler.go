@@ -67,7 +67,7 @@ func (h *GuestHandler) Create(c *fiber.Ctx) error {
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
+		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 	}
 
 	requestVM = &vms.CreateGuestRequestVM{}
@@ -76,7 +76,7 @@ func (h *GuestHandler) Create(c *fiber.Ctx) error {
 		log.Warn().
 			Ctx(ctx).
 			Err(err).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[GuestHandler][Create][BodyParser] failed to parse request body")
 		log.Debug().
 			Ctx(ctx).
@@ -104,7 +104,7 @@ func (h *GuestHandler) Create(c *fiber.Ctx) error {
 		log.WithLevel(logLevel).
 			Ctx(ctx).
 			Err(err).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[GuestHandler][Create][Create] failed to create")
 		log.Debug().
 			Ctx(ctx).
@@ -153,7 +153,7 @@ func (h *GuestHandler) DeleteByID(c *fiber.Ctx) error {
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
+		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 	}
 
 	requestVM = &vms.DeleteGuestByIDRequestVM{}
@@ -162,7 +162,7 @@ func (h *GuestHandler) DeleteByID(c *fiber.Ctx) error {
 		log.Warn().
 			Ctx(ctx).
 			Err(err).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[GuestHandler][DeleteByID][ParamsParser] failed to parse request params")
 		log.Debug().
 			Ctx(ctx).
@@ -190,7 +190,7 @@ func (h *GuestHandler) DeleteByID(c *fiber.Ctx) error {
 		log.WithLevel(logLevel).
 			Ctx(ctx).
 			Err(err).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[GuestHandler][DeleteByID][DeleteByID] failed to delete by id")
 		log.Debug().
 			Ctx(ctx).
@@ -242,7 +242,7 @@ func (h *GuestHandler) FindAll(c *fiber.Ctx) error {
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
+		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 	}
 
 	requestVM = &vms.FindAllGuestRequestVM{}
@@ -251,7 +251,7 @@ func (h *GuestHandler) FindAll(c *fiber.Ctx) error {
 		log.Warn().
 			Ctx(ctx).
 			Err(err).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[GuestHandler][FindAll][QueryParser] failed to parse request query")
 		log.Debug().
 			Ctx(ctx).
@@ -279,7 +279,7 @@ func (h *GuestHandler) FindAll(c *fiber.Ctx) error {
 		log.WithLevel(logLevel).
 			Ctx(ctx).
 			Err(err).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[GuestHandler][FindAll][FindAll] failed to find all")
 		log.Debug().
 			Ctx(ctx).
@@ -329,7 +329,7 @@ func (h *GuestHandler) FindByID(c *fiber.Ctx) error {
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
+		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 	}
 
 	requestVM = &vms.FindGuestByIDRequestVM{}
@@ -338,7 +338,7 @@ func (h *GuestHandler) FindByID(c *fiber.Ctx) error {
 		log.Warn().
 			Ctx(ctx).
 			Err(err).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[GuestHandler][FindByID][ParamsParser] failed to parse request params")
 		log.Debug().
 			Ctx(ctx).
@@ -366,7 +366,7 @@ func (h *GuestHandler) FindByID(c *fiber.Ctx) error {
 		log.WithLevel(logLevel).
 			Ctx(ctx).
 			Err(err).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[GuestHandler][FindByID][FindByID] failed to find by id")
 		log.Debug().
 			Ctx(ctx).
@@ -417,7 +417,7 @@ func (h *GuestHandler) UpdateByID(c *fiber.Ctx) error {
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
+		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 	}
 
 	requestVM = &vms.UpdateGuestByIDRequestVM{}
@@ -426,7 +426,7 @@ func (h *GuestHandler) UpdateByID(c *fiber.Ctx) error {
 		log.Warn().
 			Ctx(ctx).
 			Err(err).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[GuestHandler][UpdateByID][ParamsParser] failed to parse request params")
 		log.Debug().
 			Ctx(ctx).
@@ -446,7 +446,7 @@ func (h *GuestHandler) UpdateByID(c *fiber.Ctx) error {
 		log.Warn().
 			Ctx(ctx).
 			Err(err).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[GuestHandler][UpdateByID][BodyParser] failed to parse request body")
 		log.Debug().
 			Ctx(ctx).
@@ -474,7 +474,7 @@ func (h *GuestHandler) UpdateByID(c *fiber.Ctx) error {
 		log.WithLevel(logLevel).
 			Ctx(ctx).
 			Err(err).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[GuestHandler][UpdateByID][UpdateByID] failed to update by id")
 		log.Debug().
 			Ctx(ctx).

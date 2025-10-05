@@ -37,7 +37,7 @@ func (mw *RecoverMiddleware) Recover(c *fiber.Ctx) error {
 				JSON(responseVM)
 
 			logFields = map[string]interface{}{
-				"requestid":            custom_context.SafeCtxValue[string](c.UserContext(), constants.ContextKeyRequestID),
+				"requestid":            custom_context.GetCtxValueSafely[string](c.UserContext(), constants.ContextKeyRequestID),
 				"path":                 c.Path(),
 				"method":               c.Method(),
 				"request headers":      c.GetReqHeaders(),

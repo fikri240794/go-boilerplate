@@ -53,7 +53,7 @@ func (mw *LogMiddleware) Log(c *fiber.Ctx) error {
 	}
 
 	logFields = map[string]interface{}{
-		"requestid":            custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
+		"requestid":            custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"path":                 c.Path(),
 		"method":               c.Method(),
 		"response status code": c.Response().StatusCode(),

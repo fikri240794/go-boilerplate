@@ -47,7 +47,7 @@ func (r *boilerplateDatabaseStatement) Exec(ctx context.Context, args ...interfa
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
+		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"args":      args,
 	}
 
@@ -55,7 +55,7 @@ func (r *boilerplateDatabaseStatement) Exec(ctx context.Context, args ...interfa
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[boilerplateDatabaseStatement][Exec][ExecContext] failed to exec statement")
 		log.Debug().
 			Ctx(ctx).
@@ -79,7 +79,7 @@ func (r *boilerplateDatabaseStatement) Get(ctx context.Context, dest interface{}
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
+		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"args":      args,
 	}
 
@@ -87,7 +87,7 @@ func (r *boilerplateDatabaseStatement) Get(ctx context.Context, dest interface{}
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[boilerplateDatabaseStatement][Get][GetContext] failed to get with statement")
 		log.Debug().
 			Ctx(ctx).
@@ -111,7 +111,7 @@ func (r *boilerplateDatabaseStatement) Select(ctx context.Context, dest interfac
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
+		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"args":      args,
 	}
 
@@ -119,7 +119,7 @@ func (r *boilerplateDatabaseStatement) Select(ctx context.Context, dest interfac
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[boilerplateDatabaseStatement][Select][SelectContext] failed to select with statement")
 		log.Debug().
 			Ctx(ctx).
@@ -173,7 +173,7 @@ func (r *boilerplateDatabaseTransaction) Prepare(ctx context.Context, query stri
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
+		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"query":     query,
 	}
 
@@ -216,7 +216,7 @@ type IBoilerplateDatabaseRepository[TEntity interface{}] interface {
 	FindAll(
 		ctx context.Context,
 		filter *goqube.Filter,
-		sorts []*goqube.Sort,
+		sorts []goqube.Sort,
 		take uint64,
 		skip uint64,
 		useMaster bool,
@@ -225,7 +225,7 @@ type IBoilerplateDatabaseRepository[TEntity interface{}] interface {
 	FindOne(
 		ctx context.Context,
 		filter *goqube.Filter,
-		sorts []*goqube.Sort,
+		sorts []goqube.Sort,
 		useMaster bool,
 	) (*TEntity, error)
 
@@ -278,16 +278,16 @@ func (r *BoilerplateDatabaseRepository[TEntity]) getTableNameAndFields() (string
 	return tableName, fields
 }
 
-func (r *BoilerplateDatabaseRepository[TEntity]) getTableNameAndMapFieldWithValuesFrom(entity *TEntity) (string, map[string][]interface{}) {
+func (r *BoilerplateDatabaseRepository[TEntity]) getTableNameAndMapFieldWithValueFrom(entity *TEntity) (string, map[string]interface{}) {
 	var (
 		tableName        string
-		mapFieldAndValue map[string][]interface{}
+		mapFieldAndValue map[string]interface{}
 		entityType       reflect.Type
 		field            reflect.StructField
 		tag              string
 	)
 
-	mapFieldAndValue = map[string][]interface{}{}
+	mapFieldAndValue = map[string]interface{}{}
 
 	entityType = reflect.TypeOf(entity).Elem()
 
@@ -305,7 +305,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) getTableNameAndMapFieldWithValu
 			continue
 		}
 
-		mapFieldAndValue[tag] = append(mapFieldAndValue[tag], reflect.ValueOf(entity).Elem().Field(i).Interface())
+		mapFieldAndValue[tag] = reflect.ValueOf(entity).Elem().Field(i).Interface()
 	}
 
 	return tableName, mapFieldAndValue
@@ -327,7 +327,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) exec(ctx context.Context, query
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
+		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"query":     query,
 		"args":      args,
 	}
@@ -337,7 +337,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) exec(ctx context.Context, query
 		if err != nil {
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 				Str("query", query).
 				Msg("[BoilerplateDatabaseRepository][exec][Prepare] failed to prepare statement")
 			log.Debug().
@@ -353,7 +353,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) exec(ctx context.Context, query
 		if err != nil {
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 				Str("query", query).
 				Msg("[BoilerplateDatabaseRepository][exec][PreparexContext] failed to prepare statement")
 			log.Debug().
@@ -372,7 +372,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) exec(ctx context.Context, query
 		if errCloseStmt != nil {
 			log.Err(errCloseStmt).
 				Ctx(ctx).
-				Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 				Str("query", query).
 				Msg("[BoilerplateDatabaseRepository][exec][Close] failed to close statement")
 			log.Debug().
@@ -394,7 +394,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) exec(ctx context.Context, query
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Str("query", query).
 			Msg("[BoilerplateDatabaseRepository][exec][Exec] failed to exec statement")
 		log.Debug().
@@ -413,7 +413,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) exec(ctx context.Context, query
 	if queryExecDuration > r.db.MasterMaxQueryDurationWarning {
 		log.Warn().
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Str("query", query).
 			Str("duration", fmt.Sprintf("%.3f ms", (float64(queryExecDuration)/float64(time.Millisecond)))).
 			Msg("[BoilerplateDatabaseRepository][exec] slow query")
@@ -444,7 +444,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) BeginTransaction(ctx context.Co
 	}
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
+		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 	}
 
 	sqlxTx, err = r.db.Master.BeginTxx(ctx, nil)
@@ -488,20 +488,18 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Count(
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
-		"filter":    filter,
+		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"useMaster": useMaster,
 	}
 
 	table, _ = r.getTableNameAndFields()
-	logFields["table"] = table
 
-	selectQuery = goqube.Select(goqube.NewField("count(-1)")).
-		From(goqube.NewTable(table))
-
-	if filter != nil {
-		selectQuery = selectQuery.Where(filter)
+	selectQuery = &goqube.SelectQuery{
+		Fields: []goqube.Field{goqube.Field{Column: "COUNT(-1)"}},
+		Table:  goqube.Table{Name: table},
+		Filter: filter,
 	}
+	logFields["selectQuery"] = selectQuery
 
 	dialect = goqube.Dialect(r.db.Slave.DriverName())
 	if useMaster {
@@ -513,11 +511,11 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Count(
 	}
 	logFields["dialect"] = dialect
 
-	query, args, err = selectQuery.ToSQLWithArgsWithAlias(dialect, []interface{}{})
+	query, args, err = selectQuery.BuildSelectQuery(dialect)
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[BoilerplateDatabaseRepository][Count][ToSQLWithArgsWithAlias] failed to build select query")
 		log.Debug().
 			Ctx(ctx).
@@ -536,7 +534,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Count(
 			if err != nil {
 				log.Err(err).
 					Ctx(ctx).
-					Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+					Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 					Str("query", query).
 					Msg("[BoilerplateDatabaseRepository][Count][Prepare] failed to prepare statement")
 				log.Debug().
@@ -552,7 +550,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Count(
 			if err != nil {
 				log.Err(err).
 					Ctx(ctx).
-					Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+					Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 					Str("query", query).
 					Msg("[BoilerplateDatabaseRepository][Count][PreparexContext] failed to prepare statement")
 				log.Debug().
@@ -571,7 +569,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Count(
 		if err != nil {
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 				Str("query", query).
 				Msg("[BoilerplateDatabaseRepository][Count][PreparexContext] failed to prepare statement")
 			log.Debug().
@@ -590,7 +588,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Count(
 		if errCloseStmt != nil {
 			log.Err(errCloseStmt).
 				Ctx(ctx).
-				Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 				Str("query", query).
 				Msg("[BoilerplateDatabaseRepository][Count][Close] failed to close statement")
 			log.Debug().
@@ -615,7 +613,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Count(
 		} else {
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 				Str("query", query).
 				Msg("[BoilerplateDatabaseRepository][Count][Get] failed to count entities")
 			log.Debug().
@@ -636,7 +634,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Count(
 	if queryExecDuration > r.db.SlaveMaxQueryDurationWarning {
 		log.Warn().
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Str("query", query).
 			Str("duration", fmt.Sprintf("%.3f ms", (float64(queryExecDuration)/float64(time.Millisecond)))).
 			Msg("[BoilerplateDatabaseRepository][Count] slow query")
@@ -652,14 +650,15 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Count(
 
 func (r *BoilerplateDatabaseRepository[TEntity]) Create(ctx context.Context, entity *TEntity) error {
 	var (
-		span               trace.Span
-		logFields          map[string]interface{}
-		table              string
-		mapFieldWithValues map[string][]interface{}
-		insertQuery        *goqube.InsertQuery
-		query              string
-		args               []interface{}
-		err                error
+		span              trace.Span
+		logFields         map[string]interface{}
+		table             string
+		mapFieldWithValue map[string]interface{}
+		insertQuery       *goqube.InsertQuery
+		dialect           goqube.Dialect
+		query             string
+		args              []interface{}
+		err               error
 	)
 
 	ctx, span = tracer.Start(ctx, "[BoilerplateDatabaseRepository][Create]")
@@ -670,27 +669,26 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Create(ctx context.Context, ent
 	}
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
+		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"entity":    entity,
-		"dialect":   goqube.Dialect(r.db.Master.DriverName()),
 	}
 
-	table, mapFieldWithValues = r.getTableNameAndMapFieldWithValuesFrom(entity)
-	logFields["table"] = table
-	logFields["mapFieldWithValues"] = mapFieldWithValues
+	table, mapFieldWithValue = r.getTableNameAndMapFieldWithValueFrom(entity)
 
-	insertQuery = goqube.Insert().
-		Into(table)
-
-	for field, values := range mapFieldWithValues {
-		insertQuery = insertQuery.Value(field, values[0])
+	insertQuery = &goqube.InsertQuery{
+		Table:  table,
+		Values: []map[string]interface{}{mapFieldWithValue},
 	}
+	logFields["insertQuery"] = insertQuery
 
-	query, args, err = insertQuery.ToSQLWithArgs(goqube.Dialect(r.db.Master.DriverName()))
+	dialect = goqube.Dialect(r.db.Master.DriverName())
+	logFields["dialect"] = dialect
+
+	query, args, err = insertQuery.BuildInsertQuery(dialect)
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[BoilerplateDatabaseRepository][Create][ToSQLWithArgs] failed to build insert query")
 		log.Debug().
 			Ctx(ctx).
@@ -707,7 +705,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Create(ctx context.Context, ent
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Str("query", query).
 			Msg("[BoilerplateDatabaseRepository][Create][exec] failed to create entity")
 		log.Debug().
@@ -728,6 +726,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Delete(ctx context.Context, fil
 		logFields   map[string]interface{}
 		table       string
 		deleteQuery *goqube.DeleteQuery
+		dialect     goqube.Dialect
 		query       string
 		args        []interface{}
 		err         error
@@ -737,26 +736,25 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Delete(ctx context.Context, fil
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
-		"filter":    filter,
-		"dialect":   goqube.Dialect(r.db.Master.DriverName()),
+		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 	}
 
 	table, _ = r.getTableNameAndFields()
-	logFields["table"] = table
 
-	deleteQuery = goqube.Delete().
-		From(table)
-
-	if filter != nil {
-		deleteQuery = deleteQuery.Where(filter)
+	deleteQuery = &goqube.DeleteQuery{
+		Table:  table,
+		Filter: filter,
 	}
+	logFields["deleteQuery"] = deleteQuery
 
-	query, args, err = deleteQuery.ToSQLWithArgs(goqube.Dialect(r.db.Master.DriverName()))
+	dialect = goqube.Dialect(r.db.Master.DriverName())
+	logFields["dialect"] = dialect
+
+	query, args, err = deleteQuery.BuildDeleteQuery(dialect)
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[BoilerplateDatabaseRepository][Delete][ToSQLWithArgs] failed to build delete query")
 		log.Debug().
 			Ctx(ctx).
@@ -773,7 +771,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Delete(ctx context.Context, fil
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Str("query", query).
 			Msg("[BoilerplateDatabaseRepository][Delete][exec] failed to delete entity")
 		log.Debug().
@@ -791,7 +789,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Delete(ctx context.Context, fil
 func (r *BoilerplateDatabaseRepository[TEntity]) FindAll(
 	ctx context.Context,
 	filter *goqube.Filter,
-	sorts []*goqube.Sort,
+	sorts []goqube.Sort,
 	take uint64,
 	skip uint64,
 	useMaster bool,
@@ -801,7 +799,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindAll(
 		logFields          map[string]interface{}
 		table              string
 		fields             []string
-		selectFields       []*goqube.Field
+		selectFields       []goqube.Field
 		selectQuery        *goqube.SelectQuery
 		dialect            goqube.Dialect
 		query              string
@@ -819,36 +817,26 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindAll(
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
-		"filter":    filter,
-		"sorts":     sorts,
-		"take":      take,
-		"skip":      skip,
+		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"useMaster": useMaster,
 	}
 
 	table, fields = r.getTableNameAndFields()
-	logFields["table"] = table
-	logFields["fields"] = fields
 
-	selectFields = []*goqube.Field{}
+	selectFields = []goqube.Field{}
 	for i := range fields {
-		selectFields = append(selectFields, goqube.NewField(fields[i]))
-	}
-	logFields["selectFields"] = selectFields
-
-	selectQuery = goqube.Select(selectFields...).
-		From(goqube.NewTable(table))
-
-	if filter != nil {
-		selectQuery = selectQuery.Where(filter)
+		selectFields = append(selectFields, goqube.Field{Column: fields[i]})
 	}
 
-	if len(sorts) > 0 {
-		selectQuery = selectQuery.OrderBy(sorts...)
+	selectQuery = &goqube.SelectQuery{
+		Fields: selectFields,
+		Table:  goqube.Table{Name: table},
+		Filter: filter,
+		Sorts:  sorts,
+		Take:   take,
+		Skip:   skip,
 	}
-
-	selectQuery = selectQuery.Limit(take).Offset(skip)
+	logFields["selectQuery"] = selectQuery
 
 	dialect = goqube.Dialect(r.db.Slave.DriverName())
 	if useMaster {
@@ -860,11 +848,11 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindAll(
 	}
 	logFields["dialect"] = dialect
 
-	query, args, err = selectQuery.ToSQLWithArgsWithAlias(dialect, []interface{}{})
+	query, args, err = selectQuery.BuildSelectQuery(dialect)
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[BoilerplateDatabaseRepository][FindAll][ToSQLWithArgsWithAlias] failed to build select query")
 		log.Debug().
 			Ctx(ctx).
@@ -883,7 +871,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindAll(
 			if err != nil {
 				log.Err(err).
 					Ctx(ctx).
-					Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+					Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 					Str("query", query).
 					Msg("[BoilerplateDatabaseRepository][FindAll][Prepare] failed to prepare statement")
 				log.Debug().
@@ -899,7 +887,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindAll(
 			if err != nil {
 				log.Err(err).
 					Ctx(ctx).
-					Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+					Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 					Str("query", query).
 					Msg("[BoilerplateDatabaseRepository][FindAll][PreparexContext] failed to prepare statement")
 				log.Debug().
@@ -918,7 +906,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindAll(
 		if err != nil {
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 				Str("query", query).
 				Msg("[BoilerplateDatabaseRepository][FindAll][PreparexContext] failed to prepare statement")
 			log.Debug().
@@ -937,7 +925,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindAll(
 		if errCloseStmt != nil {
 			log.Err(errCloseStmt).
 				Ctx(ctx).
-				Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 				Str("query", query).
 				Msg("[BoilerplateDatabaseRepository][FindAll][Close] failed to close statement")
 			log.Debug().
@@ -960,7 +948,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindAll(
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Str("query", query).
 			Msg("[BoilerplateDatabaseRepository][FindAll][Select] failed to select entities")
 		log.Debug().
@@ -979,7 +967,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindAll(
 	if queryExecDuration > r.db.SlaveMaxQueryDurationWarning {
 		log.Warn().
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Str("query", query).
 			Str("duration", fmt.Sprintf("%.3f ms", (float64(queryExecDuration)/float64(time.Millisecond)))).
 			Msg("[BoilerplateDatabaseRepository][FindAll] slow query")
@@ -996,7 +984,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindAll(
 func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 	ctx context.Context,
 	filter *goqube.Filter,
-	sorts []*goqube.Sort,
+	sorts []goqube.Sort,
 	useMaster bool,
 ) (*TEntity, error) {
 	var (
@@ -1004,7 +992,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 		logFields          map[string]interface{}
 		table              string
 		fields             []string
-		selectFields       []*goqube.Field
+		selectFields       []goqube.Field
 		selectQuery        *goqube.SelectQuery
 		dialect            goqube.Dialect
 		query              string
@@ -1022,34 +1010,25 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
-		"filter":    filter,
-		"sorts":     sorts,
+		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"useMaster": useMaster,
 	}
 
 	table, fields = r.getTableNameAndFields()
-	logFields["table"] = table
-	logFields["fields"] = fields
 
-	selectFields = []*goqube.Field{}
+	selectFields = []goqube.Field{}
 	for i := range fields {
-		selectFields = append(selectFields, goqube.NewField(fields[i]))
-	}
-	logFields["selectFields"] = selectFields
-
-	selectQuery = goqube.Select(selectFields...).
-		From(goqube.NewTable(table))
-
-	if filter != nil {
-		selectQuery = selectQuery.Where(filter)
+		selectFields = append(selectFields, goqube.Field{Column: fields[i]})
 	}
 
-	if len(sorts) > 0 {
-		selectQuery = selectQuery.OrderBy(sorts...)
+	selectQuery = &goqube.SelectQuery{
+		Fields: selectFields,
+		Table:  goqube.Table{Name: table},
+		Filter: filter,
+		Sorts:  sorts,
+		Take:   1,
 	}
-
-	selectQuery = selectQuery.Limit(1)
+	logFields["selectQuery"] = selectQuery
 
 	dialect = goqube.Dialect(r.db.Slave.DriverName())
 	if useMaster {
@@ -1061,11 +1040,11 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 	}
 	logFields["dialect"] = dialect
 
-	query, args, err = selectQuery.ToSQLWithArgsWithAlias(dialect, []interface{}{})
+	query, args, err = selectQuery.BuildSelectQuery(dialect)
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[BoilerplateDatabaseRepository][FindOne][ToSQLWithArgsWithAlias] failed to build select query")
 		log.Debug().
 			Ctx(ctx).
@@ -1084,7 +1063,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 			if err != nil {
 				log.Err(err).
 					Ctx(ctx).
-					Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+					Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 					Str("query", query).
 					Msg("[BoilerplateDatabaseRepository][FindOne][Prepare] failed to prepare statement")
 				log.Debug().
@@ -1100,7 +1079,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 			if err != nil {
 				log.Err(err).
 					Ctx(ctx).
-					Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+					Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 					Str("query", query).
 					Msg("[BoilerplateDatabaseRepository][FindOne][PreparexContext] failed to prepare statement")
 				log.Debug().
@@ -1119,7 +1098,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 		if err != nil {
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 				Str("query", query).
 				Msg("[BoilerplateDatabaseRepository][FindOne][PreparexContext] failed to prepare statement")
 			log.Debug().
@@ -1138,7 +1117,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 		if errCloseStmt != nil {
 			log.Err(errCloseStmt).
 				Ctx(ctx).
-				Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 				Str("query", query).
 				Msg("[BoilerplateDatabaseRepository][FindOne][Close] failed to close statement")
 			log.Debug().
@@ -1152,7 +1131,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Str("query", query).
 			Msg("[BoilerplateDatabaseRepository][FindOne][PreparexContext] failed to prepare statement")
 		log.Debug().
@@ -1179,7 +1158,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 		} else {
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 				Str("query", query).
 				Msg("[BoilerplateDatabaseRepository][FindOne][GetContext] failed to select entity")
 			log.Debug().
@@ -1200,7 +1179,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 	if queryExecDuration > r.db.SlaveMaxQueryDurationWarning {
 		log.Warn().
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Str("query", query).
 			Str("duration", fmt.Sprintf("%.3f ms", (float64(queryExecDuration)/float64(time.Millisecond)))).
 			Msg("[BoilerplateDatabaseRepository][FindOne] slow query")
@@ -1219,8 +1198,9 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Update(ctx context.Context, ent
 		span               trace.Span
 		logFields          map[string]interface{}
 		table              string
-		mapFieldWithValues map[string][]interface{}
+		mapFieldWithValues map[string]interface{}
 		updateQuery        *goqube.UpdateQuery
+		dialect            goqube.Dialect
 		query              string
 		args               []interface{}
 		err                error
@@ -1234,31 +1214,27 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Update(ctx context.Context, ent
 	}
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID),
+		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"entity":    entity,
-		"filter":    filter,
-		"dialect":   goqube.Dialect(r.db.Master.DriverName()),
 	}
 
-	table, mapFieldWithValues = r.getTableNameAndMapFieldWithValuesFrom(entity)
-	logFields["table"] = table
-	logFields["mapFieldWithValues"] = mapFieldWithValues
+	table, mapFieldWithValues = r.getTableNameAndMapFieldWithValueFrom(entity)
 
-	updateQuery = goqube.Update(table)
-
-	for field, values := range mapFieldWithValues {
-		updateQuery = updateQuery.Set(field, values[0])
+	updateQuery = &goqube.UpdateQuery{
+		Table:       table,
+		FieldsValue: mapFieldWithValues,
+		Filter:      filter,
 	}
+	logFields["updateQuery"] = updateQuery
 
-	if filter != nil {
-		updateQuery = updateQuery.Where(filter)
-	}
+	dialect = goqube.Dialect(r.db.Master.DriverName())
+	logFields["dialect"] = dialect
 
-	query, args, err = updateQuery.ToSQLWithArgs(goqube.Dialect(r.db.Master.DriverName()))
+	query, args, err = updateQuery.BuildUpdateQuery(dialect)
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Msg("[BoilerplateDatabaseRepository][Update][ToSQLWithArgs] failed to build update query")
 		log.Debug().
 			Ctx(ctx).
@@ -1276,7 +1252,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Update(ctx context.Context, ent
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.SafeCtxValue[string](ctx, constants.ContextKeyRequestID)).
+			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
 			Str("query", query).
 			Msg("[BoilerplateDatabaseRepository][Update][exec] failed to update entity")
 		log.Debug().
