@@ -19,6 +19,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+//go:generate go run github.com/vektra/mockery/v2 --name IBoilerplateDatabaseStatement --structname BoilerplateDatabaseStatementMock --filename boilerplate_database_statement_mock.go
 type IBoilerplateDatabaseStatement interface {
 	Exec(ctx context.Context, args ...interface{}) error
 	Get(ctx context.Context, dest interface{}, args ...interface{}) error
@@ -136,6 +137,7 @@ func (r *boilerplateDatabaseStatement) Close() error {
 	return r.stmt.Stmt.Close()
 }
 
+//go:generate go run github.com/vektra/mockery/v2 --name IBoilerplateDatabaseTransaction --structname BoilerplateDatabaseTransactionMock --filename boilerplate_database_transaction_mock.go
 type IBoilerplateDatabaseTransaction interface {
 	Commit() error
 	DriverName() string
@@ -200,6 +202,7 @@ func (r *boilerplateDatabaseTransaction) Rollback() error {
 	return nil
 }
 
+//go:generate go run github.com/vektra/mockery/v2 --name IBoilerplateDatabaseRepository --structname BoilerplateDatabaseRepositoryMock --filename boilerplate_database_repository_mock.go
 type IBoilerplateDatabaseRepository[TEntity interface{}] interface {
 	BeginTransaction(ctx context.Context) (IBoilerplateDatabaseTransaction, error)
 
@@ -495,7 +498,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Count(
 	table, _ = r.getTableNameAndFields()
 
 	selectQuery = &goqube.SelectQuery{
-		Fields: []goqube.Field{goqube.Field{Column: "COUNT(-1)"}},
+		Fields: []goqube.Field{{Column: "COUNT(-1)"}},
 		Table:  goqube.Table{Name: table},
 		Filter: filter,
 	}
@@ -1127,21 +1130,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 				Msg("[BoilerplateDatabaseRepository][FindOne][Close] failed to close statement")
 		}
 	}()
-
-	if err != nil {
-		log.Err(err).
-			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Str("query", query).
-			Msg("[BoilerplateDatabaseRepository][FindOne][PreparexContext] failed to prepare statement")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
-			Fields(fields).
-			Msg("[BoilerplateDatabaseRepository][FindOne][PreparexContext] failed to prepare statement")
-		err = gocerr.New(http.StatusInternalServerError, err.Error())
-		return nil, err
-	}
 
 	log.Debug().
 		Ctx(ctx).

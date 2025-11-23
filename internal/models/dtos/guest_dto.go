@@ -56,6 +56,7 @@ func NewFindAllGuestRequestDTO() *FindAllGuestRequestDTO {
 		Take: 10,
 	}
 }
+
 func (dto *FindAllGuestRequestDTO) ToFilterAndSorts() (*goqube.Filter, []goqube.Sort, error) {
 	var (
 		filter         *goqube.Filter
@@ -95,24 +96,10 @@ func (dto *FindAllGuestRequestDTO) ToFilterAndSorts() (*goqube.Filter, []goqube.
 
 	if dto.Sorts != "" {
 		splittedString = strings.Split(dto.Sorts, ",")
-		if len(splittedString) <= 0 {
-			sorts = append(sorts, goqube.Sort{
-				Field:     goqube.Field{Column: entities.GuestEntityDatabaseFieldName},
-				Direction: goqube.SortDirectionAscending,
-			})
-		}
 	}
 
 	for i := range splittedString {
 		var sortFieldAndDirection []string = strings.Split(splittedString[i], ".")
-		if len(sortFieldAndDirection) <= 0 {
-			err = gocerr.New(
-				http.StatusBadRequest,
-				http.StatusText(http.StatusBadRequest),
-				gocerr.NewErrorField("sorts", "invalid sorts value"),
-			)
-			return nil, nil, err
-		}
 
 		if len(sortFieldAndDirection) == 1 {
 			if sortFieldAndDirection[0] != entities.GuestEntityDatabaseFieldName &&

@@ -17,6 +17,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+//go:generate go run github.com/vektra/mockery/v2 --name IInMemoryDatabaseRepository --structname InMemoryDatabaseRepositoryMock --filename in_memory_database_repository_mock.go
 type IInMemoryDatabaseRepository[TEntity interface{}] interface {
 	Delete(ctx context.Context, keys ...string) error
 	Get(ctx context.Context, key string) (*TEntity, error)

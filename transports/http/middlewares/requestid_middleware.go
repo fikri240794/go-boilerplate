@@ -10,8 +10,6 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-const ()
-
 type RequestIDMiddleware struct{}
 
 func NewRequestIDMiddleware() *RequestIDMiddleware {

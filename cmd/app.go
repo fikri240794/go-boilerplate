@@ -7,6 +7,7 @@ import (
 	"go-boilerplate/transports/event_consumer"
 	"go-boilerplate/transports/grpc"
 	"go-boilerplate/transports/http"
+	"log"
 
 	"github.com/fikri240794/gotask"
 	"github.com/fikri240794/goteletracer"
@@ -23,6 +24,12 @@ func initApp() {
 		Short: "app",
 		Long:  "app command",
 		PreRun: func(cmd *cobra.Command, args []string) {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("[ERROR] Panic recovered in PreRun: %v", r)
+				}
+			}()
+
 			cfg = configs.Read(cfgPath)
 
 			tracer.NewTracer(&goteletracer.Config{
@@ -33,14 +40,29 @@ func initApp() {
 			var task gotask.Task = gotask.NewTask(3)
 
 			task.Go(func() {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Printf("[ERROR] Panic recovered while building HTTP server: %v", r)
+					}
+				}()
 				httpServer = http.BuildHTTPServer(cfg)
 			})
 
 			task.Go(func() {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Printf("[ERROR] Panic recovered while building GRPC server: %v", r)
+					}
+				}()
 				grpcServer = grpc.BuildGRPCServer(cfg)
 			})
 
 			task.Go(func() {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Printf("[ERROR] Panic recovered while building event consumer: %v", r)
+					}
+				}()
 				eventConsumer = event_consumer.BuildEventConsumer(cfg)
 			})
 
@@ -54,11 +76,32 @@ func initApp() {
 
 			errTask, _ = gotask.NewErrorTask(context.Background(), 3)
 
-			errTask.Go(httpServer.ServeHTTP)
+			errTask.Go(func() error {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Printf("[ERROR] Panic recovered while serving HTTP: %v", r)
+					}
+				}()
+				return httpServer.ServeHTTP()
+			})
 
-			errTask.Go(grpcServer.ServeGRPC)
+			errTask.Go(func() error {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Printf("[ERROR] Panic recovered while serving GRPC: %v", r)
+					}
+				}()
+				return grpcServer.ServeGRPC()
+			})
 
-			errTask.Go(eventConsumer.ConsumeEvents)
+			errTask.Go(func() error {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Printf("[ERROR] Panic recovered while consuming events: %v", r)
+					}
+				}()
+				return eventConsumer.ConsumeEvents()
+			})
 
 			err = errTask.Wait()
 

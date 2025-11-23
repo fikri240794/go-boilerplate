@@ -20,10 +20,12 @@
 # Go workspace file
 go.work
 go.work.sum
+*coverage*
 
 # env file
 .env
 
 # generated directories & files
-transports/http/docs/swagger
+**/swagger*
 wire_gen.go
+**/mock*

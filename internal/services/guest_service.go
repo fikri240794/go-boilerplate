@@ -22,6 +22,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+//go:generate go run github.com/vektra/mockery/v2 --name IGuestService --structname GuestServiceMock --filename guest_service_mock.go
 type IGuestService interface {
 	Create(ctx context.Context, requestDTO *dtos.CreateGuestRequestDTO) (*dtos.GuestResponseDTO, error)
 	DeleteByID(ctx context.Context, requestDTO *dtos.DeleteGuestByIDRequestDTO) error

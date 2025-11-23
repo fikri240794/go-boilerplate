@@ -23,7 +23,7 @@ var (
 	upDatabaseMigrationStep             int
 	downDatabaseMigrationStep           int
 	toDatabaseMigrationVersion          uint
-	forceDatabaseMigrationVersion       uint
+	forceDatabaseMigrationVersion       int
 	newDatabaseMigrationFileName        string
 	createEmptyDatabaseMigrationFileCmd *cobra.Command
 	showDatabaseVersionCmd              *cobra.Command
@@ -189,7 +189,7 @@ func to(databaseMigrator *migrate.Migrate, version uint) error {
 	return nil
 }
 
-func force(databaseMigrator *migrate.Migrate, version uint) error {
+func force(databaseMigrator *migrate.Migrate, version int) error {
 	var err error
 
 	if version == 0 {
@@ -197,7 +197,7 @@ func force(databaseMigrator *migrate.Migrate, version uint) error {
 		return err
 	}
 
-	err = databaseMigrator.Force(int(version))
+	err = databaseMigrator.Force(version)
 	if err != nil {
 		return err
 	}
@@ -388,7 +388,7 @@ func initForceDatabaseMigrationCmd() {
 	}
 	setRequiredFlags(forceDatabaseMigrationCmd)
 	forceDatabaseMigrationCmd.Flags().
-		UintVarP(
+		IntVarP(
 			&forceDatabaseMigrationVersion,
 			"version",
 			"v",
