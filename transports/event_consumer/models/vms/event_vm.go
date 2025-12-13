@@ -2,6 +2,7 @@ package vms
 
 import (
 	"context"
+	"go-boilerplate/pkg/constants"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
@@ -16,6 +17,10 @@ type EventRequestVM[Tvm interface{}] struct {
 func (vm *EventRequestVM[Tvm]) ExtractTracerPropagator(ctx context.Context) context.Context {
 	if len(vm.TracerPropagator) > 0 {
 		ctx = otel.GetTextMapPropagator().Extract(ctx, propagation.MapCarrier(vm.TracerPropagator))
+
+		if vm.TracerPropagator[string(constants.ContextKeyRequestID)] != "" {
+			ctx = context.WithValue(ctx, constants.ContextKeyRequestID, vm.TracerPropagator[string(constants.ContextKeyRequestID)])
+		}
 	}
 
 	return ctx

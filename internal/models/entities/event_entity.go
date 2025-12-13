@@ -2,6 +2,9 @@ package entities
 
 import (
 	"context"
+	"go-boilerplate/pkg/constants"
+
+	custom_context "go-boilerplate/pkg/context"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
@@ -21,8 +24,16 @@ func NewEventEntity[TEntity interface{}](name string, message *TEntity) *EventEn
 }
 
 func (e *EventEntity[TEntity]) InjectTracerPropagator(ctx context.Context) (context.Context, *EventEntity[TEntity]) {
+	var requestID string
+
 	e.TracerPropagator = map[string]string{}
+
 	otel.GetTextMapPropagator().Inject(ctx, propagation.MapCarrier(e.TracerPropagator))
+
+	requestID = custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)
+	if requestID != "" {
+		e.TracerPropagator[string(constants.ContextKeyRequestID)] = requestID
+	}
 
 	return ctx, e
 }

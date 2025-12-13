@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"go-boilerplate/datasources/in_memory_database"
-	"go-boilerplate/pkg/constants"
-	custom_context "go-boilerplate/pkg/context"
 	"go-boilerplate/pkg/tracer"
 	"net/http"
 	"time"
@@ -52,8 +50,7 @@ func (r *InMemoryDatabaseRepository[TEntity]) Delete(ctx context.Context, keys .
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
-		"keys":      keys,
+		"keys": keys,
 	}
 
 	_, err = r.inMemoryDatabase.RedisClient.Del(ctx, keys...).
@@ -61,11 +58,6 @@ func (r *InMemoryDatabaseRepository[TEntity]) Delete(ctx context.Context, keys .
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[InMemoryDatabaseRepository][Delete][Del][Result] failed to delete")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[InMemoryDatabaseRepository][Delete][Del][Result] failed to delete")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -89,8 +81,7 @@ func (r *InMemoryDatabaseRepository[TEntity]) Get(ctx context.Context, key strin
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
-		"key":       key,
+		"key": key,
 	}
 
 	err = r.inMemoryDatabase.RedisClient.
@@ -102,15 +93,9 @@ func (r *InMemoryDatabaseRepository[TEntity]) Get(ctx context.Context, key strin
 			errorCode = http.StatusInternalServerError
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
+				Fields(logFields).
 				Msg("[InMemoryDatabaseRepository][Get][Get][Scan] failed to get")
 		}
-
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
-			Fields(logFields).
-			Msg("[InMemoryDatabaseRepository][Get][Get][Scan] failed to get")
 		err = gocerr.New(errorCode, err.Error())
 		return nil, err
 	}
@@ -122,11 +107,6 @@ func (r *InMemoryDatabaseRepository[TEntity]) Get(ctx context.Context, key strin
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[InMemoryDatabaseRepository][Get][Unmarshal] failed to unmarshal raw value")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[InMemoryDatabaseRepository][Get][Unmarshal] failed to unmarshal raw value")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -150,8 +130,7 @@ func (r *InMemoryDatabaseRepository[TEntity]) GetList(ctx context.Context, key s
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
-		"key":       key,
+		"key": key,
 	}
 
 	err = r.inMemoryDatabase.RedisClient.
@@ -163,15 +142,9 @@ func (r *InMemoryDatabaseRepository[TEntity]) GetList(ctx context.Context, key s
 			errorCode = http.StatusInternalServerError
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
+				Fields(logFields).
 				Msg("[InMemoryDatabaseRepository][GetList][Get][Scan] failed to get")
 		}
-
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
-			Fields(logFields).
-			Msg("[InMemoryDatabaseRepository][GetList][Get][Scan] failed to get")
 		err = gocerr.New(errorCode, err.Error())
 		return nil, err
 	}
@@ -182,11 +155,6 @@ func (r *InMemoryDatabaseRepository[TEntity]) GetList(ctx context.Context, key s
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[InMemoryDatabaseRepository][GetList][Unmarshal] failed to unmarshal raw values")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[InMemoryDatabaseRepository][GetList][Unmarshal] failed to unmarshal raw values")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -209,8 +177,7 @@ func (r *InMemoryDatabaseRepository[TEntity]) GetCount(ctx context.Context, key 
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
-		"key":       key,
+		"key": key,
 	}
 
 	value, err = r.inMemoryDatabase.RedisClient.
@@ -222,15 +189,9 @@ func (r *InMemoryDatabaseRepository[TEntity]) GetCount(ctx context.Context, key 
 			errorCode = http.StatusInternalServerError
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
+				Fields(logFields).
 				Msg("[InMemoryDatabaseRepository][GetCount][Get][Uint64] failed to get")
 		}
-
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
-			Fields(logFields).
-			Msg("[InMemoryDatabaseRepository][GetCount][Get][Uint64] failed to get")
 		err = gocerr.New(errorCode, err.Error())
 		return 0, err
 	}
@@ -250,8 +211,7 @@ func (r *InMemoryDatabaseRepository[TEntity]) Keys(ctx context.Context, pattern 
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
-		"pattern":   pattern,
+		"pattern": pattern,
 	}
 
 	keys, err = r.inMemoryDatabase.RedisClient.Keys(ctx, pattern).
@@ -259,11 +219,6 @@ func (r *InMemoryDatabaseRepository[TEntity]) Keys(ctx context.Context, pattern 
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[InMemoryDatabaseRepository][Keys][Keys][Result] failed to get keys")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[InMemoryDatabaseRepository][Keys][Keys][Result] failed to get keys")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -285,7 +240,6 @@ func (r *InMemoryDatabaseRepository[TEntity]) Lock(ctx context.Context, key stri
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid":  custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"key":        key,
 		"expiration": expiration,
 	}
@@ -295,11 +249,6 @@ func (r *InMemoryDatabaseRepository[TEntity]) Lock(ctx context.Context, key stri
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[InMemoryDatabaseRepository][Lock][Incr][Result] failed to increment")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[InMemoryDatabaseRepository][Lock][Incr][Result] failed to increment")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -317,11 +266,6 @@ func (r *InMemoryDatabaseRepository[TEntity]) Lock(ctx context.Context, key stri
 		if err != nil {
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-				Msg("[InMemoryDatabaseRepository][Lock][Expire][Result] failed to set expire")
-			log.Debug().
-				Ctx(ctx).
-				Err(err).
 				Fields(logFields).
 				Msg("[InMemoryDatabaseRepository][Lock][Expire][Result] failed to set expire")
 			err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -349,7 +293,6 @@ func (r *InMemoryDatabaseRepository[TEntity]) Set(ctx context.Context, key strin
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid":  custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"key":        key,
 		"value":      value,
 		"expiration": expiration,
@@ -359,11 +302,6 @@ func (r *InMemoryDatabaseRepository[TEntity]) Set(ctx context.Context, key strin
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[InMemoryDatabaseRepository][Set][Marshal] failed to marshal value")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[InMemoryDatabaseRepository][Set][Marshal] failed to marshal value")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -380,11 +318,6 @@ func (r *InMemoryDatabaseRepository[TEntity]) Set(ctx context.Context, key strin
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[InMemoryDatabaseRepository][Set][Set][Result] failed to set")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[InMemoryDatabaseRepository][Set][Set][Result] failed to set")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -406,7 +339,6 @@ func (r *InMemoryDatabaseRepository[TEntity]) SetList(ctx context.Context, key s
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid":  custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"key":        key,
 		"values":     values,
 		"expiration": expiration,
@@ -416,11 +348,6 @@ func (r *InMemoryDatabaseRepository[TEntity]) SetList(ctx context.Context, key s
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[InMemoryDatabaseRepository][SetList][Marshal] failed to marshal value")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[InMemoryDatabaseRepository][SetList][Marshal] failed to marshal value")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -437,11 +364,6 @@ func (r *InMemoryDatabaseRepository[TEntity]) SetList(ctx context.Context, key s
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[InMemoryDatabaseRepository][SetList][Set][Result] failed to set")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[InMemoryDatabaseRepository][SetList][Set][Result] failed to set")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -462,7 +384,6 @@ func (r *InMemoryDatabaseRepository[TEntity]) SetCount(ctx context.Context, key 
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid":  custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"key":        key,
 		"value":      value,
 		"expiration": expiration,
@@ -478,11 +399,6 @@ func (r *InMemoryDatabaseRepository[TEntity]) SetCount(ctx context.Context, key 
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[InMemoryDatabaseRepository][SetCount][Set][Result] failed to set")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[InMemoryDatabaseRepository][SetCount][Set][Result] failed to set")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -499,8 +415,7 @@ func (r *InMemoryDatabaseRepository[TEntity]) Unlock(ctx context.Context, key st
 	)
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
-		"key":       key,
+		"key": key,
 	}
 
 	_, err = r.inMemoryDatabase.RedisClient.Del(ctx, key).
@@ -508,11 +423,6 @@ func (r *InMemoryDatabaseRepository[TEntity]) Unlock(ctx context.Context, key st
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[InMemoryDatabaseRepository][Unlock][Delete][Result] failed to delete")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[InMemoryDatabaseRepository][Unlock][Delete][Result] failed to delete")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())

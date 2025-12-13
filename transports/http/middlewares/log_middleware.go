@@ -3,8 +3,6 @@ package middlewares
 import (
 	"context"
 	"fmt"
-	"go-boilerplate/pkg/constants"
-	custom_context "go-boilerplate/pkg/context"
 	"go-boilerplate/pkg/tracer"
 	"time"
 
@@ -53,25 +51,18 @@ func (mw *LogMiddleware) Log(c *fiber.Ctx) error {
 	}
 
 	logFields = map[string]interface{}{
-		"requestid":            custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"path":                 c.Path(),
 		"method":               c.Method(),
 		"response status code": c.Response().StatusCode(),
 		"latency":              fmt.Sprintf("%.3f ms", (float64(latency) / float64(time.Millisecond))),
+		"request headers":      c.GetReqHeaders(),
+		"request queries":      c.Queries(),
+		"request body":         string(c.Body()),
+		"response headers":     c.GetRespHeaders(),
+		"response body":        string(c.Response().Body()),
 	}
 
 	log.WithLevel(logLevel).
-		Ctx(ctx).
-		Fields(logFields).
-		Msg("request response")
-
-	logFields["request headers"] = c.GetReqHeaders()
-	logFields["request queries"] = c.Queries()
-	logFields["request body"] = string(c.Body())
-	logFields["response headers"] = c.GetRespHeaders()
-	logFields["response body"] = string(c.Response().Body())
-
-	log.Debug().
 		Ctx(ctx).
 		Fields(logFields).
 		Msg("request response")

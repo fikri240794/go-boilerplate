@@ -6,8 +6,6 @@ import (
 	"go-boilerplate/configs"
 	"go-boilerplate/datasources/webhook_site_http_client"
 	"go-boilerplate/internal/models/entities"
-	"go-boilerplate/pkg/constants"
-	custom_context "go-boilerplate/pkg/context"
 	"go-boilerplate/pkg/tracer"
 	"net/http"
 
@@ -57,7 +55,6 @@ func (r *WebhookSiteRepository) SendWebhook(ctx context.Context, requestData *en
 	otel.GetTextMapPropagator().Inject(ctx, propagation.MapCarrier(httpRequestHeaders))
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"url": fmt.Sprintf(
 			"%s%s",
 			r.cfg.Datasource.WebhookSiteHTTPClient.BaseURL,
@@ -68,11 +65,6 @@ func (r *WebhookSiteRepository) SendWebhook(ctx context.Context, requestData *en
 		"requestMethod":  http.MethodPost,
 	}
 
-	log.Debug().
-		Ctx(ctx).
-		Fields(logFields).
-		Msg("[WebhookSiteRepository][SendWebhook] http request in progress")
-
 	httpResponse, err = r.httpClient.HttpClient.R().
 		SetContext(ctx).
 		SetHeaders(httpRequestHeaders).
@@ -81,11 +73,6 @@ func (r *WebhookSiteRepository) SendWebhook(ctx context.Context, requestData *en
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[WebhookSiteRepository][SendWebhook][Post] failed to request http")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[WebhookSiteRepository][SendWebhook][Post] failed to request http")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -95,11 +82,6 @@ func (r *WebhookSiteRepository) SendWebhook(ctx context.Context, requestData *en
 	logFields["statusCode"] = httpResponse.StatusCode()
 	logFields["responseHeaders"] = httpResponse.Header()
 	logFields["responseBody"] = string(httpResponse.Body())
-
-	log.Debug().
-		Ctx(ctx).
-		Fields(logFields).
-		Msg("[WebhookSiteRepository][SendWebhook] http request in completed")
 
 	if httpResponse.StatusCode() >= http.StatusBadRequest {
 		logLevel = zerolog.WarnLevel
@@ -114,11 +96,6 @@ func (r *WebhookSiteRepository) SendWebhook(ctx context.Context, requestData *en
 		log.WithLevel(logLevel).
 			Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msgf("[WebhookSiteRepository][SendWebhook] http response is not success")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msgf("[WebhookSiteRepository][SendWebhook] http response is not success")
 		return err

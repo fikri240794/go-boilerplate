@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"go-boilerplate/pkg/constants"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -181,6 +183,20 @@ func TestEventEntity_InjectTracerPropagator(t *testing.T) {
 				assert.NotNil(t, ctx2)
 				assert.Equal(t, resultEntity, entity2)
 				assert.NotNil(t, entity2.TracerPropagator)
+			},
+		},
+		{
+			name: "inject tracer propagator with requestid in context",
+			entity: &EventEntity[TestMessage]{
+				Name:             "requestid.event",
+				Message:          &TestMessage{ID: 5, Content: "requestid test"},
+				TracerPropagator: nil,
+			},
+			ctx: context.WithValue(context.Background(), constants.ContextKeyRequestID, "test-request-123"),
+			validate: func(t *testing.T, resultCtx context.Context, resultEntity *EventEntity[TestMessage], originalEntity *EventEntity[TestMessage]) {
+				assert.NotNil(t, resultEntity.TracerPropagator)
+				assert.Contains(t, resultEntity.TracerPropagator, string(constants.ContextKeyRequestID))
+				assert.Equal(t, "test-request-123", resultEntity.TracerPropagator[string(constants.ContextKeyRequestID)])
 			},
 		},
 	}

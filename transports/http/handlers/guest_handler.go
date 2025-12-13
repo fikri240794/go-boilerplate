@@ -4,8 +4,6 @@ import (
 	"context"
 	"go-boilerplate/internal/models/dtos"
 	"go-boilerplate/internal/services"
-	"go-boilerplate/pkg/constants"
-	custom_context "go-boilerplate/pkg/context"
 	"go-boilerplate/pkg/tracer"
 	"go-boilerplate/transports/http/models/vms"
 
@@ -66,19 +64,12 @@ func (h *GuestHandler) Create(c *fiber.Ctx) error {
 	ctx, span = tracer.Start(ctx, "[GuestHandler][Create]")
 	defer span.End()
 
-	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
-	}
+	logFields = map[string]interface{}{}
 
 	requestVM = &vms.CreateGuestRequestVM{}
 	err = c.BodyParser(requestVM)
 	if err != nil {
 		log.Warn().
-			Ctx(ctx).
-			Err(err).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestHandler][Create][BodyParser] failed to parse request body")
-		log.Debug().
 			Ctx(ctx).
 			Err(err).
 			Fields(logFields).
@@ -102,11 +93,6 @@ func (h *GuestHandler) Create(c *fiber.Ctx) error {
 		}
 
 		log.WithLevel(logLevel).
-			Ctx(ctx).
-			Err(err).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestHandler][Create][Create] failed to create")
-		log.Debug().
 			Ctx(ctx).
 			Err(err).
 			Fields(logFields).
@@ -152,19 +138,12 @@ func (h *GuestHandler) DeleteByID(c *fiber.Ctx) error {
 	ctx, span = tracer.Start(ctx, "[GuestHandler][DeleteByID]")
 	defer span.End()
 
-	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
-	}
+	logFields = map[string]interface{}{}
 
 	requestVM = &vms.DeleteGuestByIDRequestVM{}
 	err = c.ParamsParser(requestVM)
 	if err != nil {
 		log.Warn().
-			Ctx(ctx).
-			Err(err).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestHandler][DeleteByID][ParamsParser] failed to parse request params")
-		log.Debug().
 			Ctx(ctx).
 			Err(err).
 			Fields(logFields).
@@ -188,11 +167,6 @@ func (h *GuestHandler) DeleteByID(c *fiber.Ctx) error {
 		}
 
 		log.WithLevel(logLevel).
-			Ctx(ctx).
-			Err(err).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestHandler][DeleteByID][DeleteByID] failed to delete by id")
-		log.Debug().
 			Ctx(ctx).
 			Err(err).
 			Fields(logFields).
@@ -241,19 +215,12 @@ func (h *GuestHandler) FindAll(c *fiber.Ctx) error {
 	ctx, span = tracer.Start(ctx, "[GuestHandler][FindAll]")
 	defer span.End()
 
-	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
-	}
+	logFields = map[string]interface{}{}
 
 	requestVM = &vms.FindAllGuestRequestVM{}
 	err = c.QueryParser(requestVM)
 	if err != nil {
 		log.Warn().
-			Ctx(ctx).
-			Err(err).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestHandler][FindAll][QueryParser] failed to parse request query")
-		log.Debug().
 			Ctx(ctx).
 			Err(err).
 			Fields(logFields).
@@ -277,11 +244,6 @@ func (h *GuestHandler) FindAll(c *fiber.Ctx) error {
 		}
 
 		log.WithLevel(logLevel).
-			Ctx(ctx).
-			Err(err).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestHandler][FindAll][FindAll] failed to find all")
-		log.Debug().
 			Ctx(ctx).
 			Err(err).
 			Fields(logFields).
@@ -328,19 +290,12 @@ func (h *GuestHandler) FindByID(c *fiber.Ctx) error {
 	ctx, span = tracer.Start(ctx, "[GuestHandler][FindByID]")
 	defer span.End()
 
-	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
-	}
+	logFields = map[string]interface{}{}
 
 	requestVM = &vms.FindGuestByIDRequestVM{}
 	err = c.ParamsParser(requestVM)
 	if err != nil {
 		log.Warn().
-			Ctx(ctx).
-			Err(err).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestHandler][FindByID][ParamsParser] failed to parse request params")
-		log.Debug().
 			Ctx(ctx).
 			Err(err).
 			Fields(logFields).
@@ -364,11 +319,6 @@ func (h *GuestHandler) FindByID(c *fiber.Ctx) error {
 		}
 
 		log.WithLevel(logLevel).
-			Ctx(ctx).
-			Err(err).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestHandler][FindByID][FindByID] failed to find by id")
-		log.Debug().
 			Ctx(ctx).
 			Err(err).
 			Fields(logFields).
@@ -416,19 +366,12 @@ func (h *GuestHandler) UpdateByID(c *fiber.Ctx) error {
 	ctx, span = tracer.Start(ctx, "[GuestHandler][UpdateByID]")
 	defer span.End()
 
-	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
-	}
+	logFields = map[string]interface{}{}
 
 	requestVM = &vms.UpdateGuestByIDRequestVM{}
 	err = c.ParamsParser(requestVM)
 	if err != nil {
 		log.Warn().
-			Ctx(ctx).
-			Err(err).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestHandler][UpdateByID][ParamsParser] failed to parse request params")
-		log.Debug().
 			Ctx(ctx).
 			Err(err).
 			Fields(logFields).
@@ -444,11 +387,6 @@ func (h *GuestHandler) UpdateByID(c *fiber.Ctx) error {
 	err = c.BodyParser(requestVM)
 	if err != nil {
 		log.Warn().
-			Ctx(ctx).
-			Err(err).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestHandler][UpdateByID][BodyParser] failed to parse request body")
-		log.Debug().
 			Ctx(ctx).
 			Err(err).
 			Fields(logFields).
@@ -472,11 +410,6 @@ func (h *GuestHandler) UpdateByID(c *fiber.Ctx) error {
 		}
 
 		log.WithLevel(logLevel).
-			Ctx(ctx).
-			Err(err).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestHandler][UpdateByID][UpdateByID] failed to update by id")
-		log.Debug().
 			Ctx(ctx).
 			Err(err).
 			Fields(logFields).

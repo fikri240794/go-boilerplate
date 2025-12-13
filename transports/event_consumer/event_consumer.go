@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"go-boilerplate/configs"
 	"go-boilerplate/datasources"
+	"go-boilerplate/pkg/logger"
 	"go-boilerplate/transports/event_consumer/consumers"
 	"os"
 	"os/signal"
@@ -84,7 +85,8 @@ func (c *EventConsumer) setGlobalLog() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{
 		Out:        os.Stderr,
 		TimeFormat: time.RFC3339,
-	})
+	}).
+		Hook(logger.NewContextHook())
 }
 
 func (c *EventConsumer) ConsumeEvents() error {

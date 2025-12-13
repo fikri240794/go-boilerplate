@@ -7,8 +7,6 @@ import (
 	"go-boilerplate/internal/models/dtos"
 	"go-boilerplate/internal/models/entities"
 	"go-boilerplate/internal/repositories"
-	"go-boilerplate/pkg/constants"
-	custom_context "go-boilerplate/pkg/context"
 	"go-boilerplate/pkg/tracer"
 	"net/http"
 	"regexp"
@@ -68,9 +66,7 @@ func (s *GuestService) deleteEntityCaches(ctx context.Context) error {
 	ctx, span = tracer.Start(ctx, "[GuestService][deleteEntityCaches]")
 	defer span.End()
 
-	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
-	}
+	logFields = map[string]interface{}{}
 
 	pattern = fmt.Sprintf(s.cfg.Guest.Cache.Keyf, "*")
 	logFields["pattern"] = pattern
@@ -79,11 +75,6 @@ func (s *GuestService) deleteEntityCaches(ctx context.Context) error {
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][deleteEntityCaches][Keys] failed to get cache keys")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[GuestService][deleteEntityCaches][Keys] failed to get cache keys")
 		return err
@@ -99,11 +90,6 @@ func (s *GuestService) deleteEntityCaches(ctx context.Context) error {
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][deleteEntityCaches][Delete] failed to delete caches")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[GuestService][deleteEntityCaches][Delete] failed to delete caches")
 		return err
@@ -131,18 +117,12 @@ func (s *GuestService) Create(ctx context.Context, requestDTO *dtos.CreateGuestR
 	}
 
 	logFields = map[string]interface{}{
-		"requestid":  custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"requestDTO": requestDTO,
 	}
 
 	err = requestDTO.Validate()
 	if err != nil {
 		log.Warn().
-			Ctx(ctx).
-			Err(err).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][Create][Validate] failed to validate dto")
-		log.Debug().
 			Ctx(ctx).
 			Err(err).
 			Fields(logFields).
@@ -157,11 +137,6 @@ func (s *GuestService) Create(ctx context.Context, requestDTO *dtos.CreateGuestR
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][Create][BeginTransaction] failed to begin transaction")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[GuestService][Create][BeginTransaction] failed to begin transaction")
 		return nil, err
@@ -172,11 +147,6 @@ func (s *GuestService) Create(ctx context.Context, requestDTO *dtos.CreateGuestR
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][Create][WithTransaction][Create] failed to create entity")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[GuestService][Create][WithTransaction][Create] failed to create entity")
 
@@ -184,11 +154,6 @@ func (s *GuestService) Create(ctx context.Context, requestDTO *dtos.CreateGuestR
 		if errRollback != nil {
 			log.Err(errRollback).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-				Msg("[GuestService][Create][Rollback] failed to rollback transaction")
-			log.Debug().
-				Ctx(ctx).
-				Err(errRollback).
 				Fields(logFields).
 				Msg("[GuestService][Create][Rollback] failed to rollback transaction")
 		}
@@ -200,11 +165,6 @@ func (s *GuestService) Create(ctx context.Context, requestDTO *dtos.CreateGuestR
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][Create][Commit] failed to commit transaction")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[GuestService][Create][Commit] failed to commit transaction")
 
@@ -212,11 +172,6 @@ func (s *GuestService) Create(ctx context.Context, requestDTO *dtos.CreateGuestR
 		if errRollback != nil {
 			log.Err(errRollback).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-				Msg("[GuestService][Create][Rollback] failed to rollback transaction")
-			log.Debug().
-				Ctx(ctx).
-				Err(errRollback).
 				Fields(logFields).
 				Msg("[GuestService][Create][Rollback] failed to rollback transaction")
 		}
@@ -231,11 +186,6 @@ func (s *GuestService) Create(ctx context.Context, requestDTO *dtos.CreateGuestR
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][Create][deleteEntityCaches] failed to delete caches")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[GuestService][Create][deleteEntityCaches] failed to delete caches")
 		err = nil
@@ -255,11 +205,6 @@ func (s *GuestService) Create(ctx context.Context, requestDTO *dtos.CreateGuestR
 		if err != nil {
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-				Msg("[GuestService][Create][Publish] failed to publish message")
-			log.Debug().
-				Ctx(ctx).
-				Err(err).
 				Fields(logFields).
 				Msg("[GuestService][Create][Publish] failed to publish message")
 			err = nil
@@ -289,18 +234,12 @@ func (s *GuestService) DeleteByID(ctx context.Context, requestDTO *dtos.DeleteGu
 	}
 
 	logFields = map[string]interface{}{
-		"requestid":  custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"requestDTO": requestDTO,
 	}
 
 	err = requestDTO.Validate()
 	if err != nil {
 		log.Warn().
-			Ctx(ctx).
-			Err(err).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][DeleteByID][Validate] failed to validate dto")
-		log.Debug().
 			Ctx(ctx).
 			Err(err).
 			Fields(logFields).
@@ -340,11 +279,6 @@ func (s *GuestService) DeleteByID(ctx context.Context, requestDTO *dtos.DeleteGu
 		log.WithLevel(logLevel).
 			Ctx(ctx).
 			Err(err).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][DeleteByID][FindOne] failed to find entity")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[GuestService][DeleteByID][FindOne] failed to find entity")
 		return err
@@ -357,11 +291,6 @@ func (s *GuestService) DeleteByID(ctx context.Context, requestDTO *dtos.DeleteGu
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][DeleteByID][BeginTransaction] failed to begin transaction")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[GuestService][DeleteByID][BeginTransaction] failed to begin transaction")
 		return err
@@ -376,11 +305,6 @@ func (s *GuestService) DeleteByID(ctx context.Context, requestDTO *dtos.DeleteGu
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][DeleteByID][WithTransaction][Update] failed to update entity")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[GuestService][DeleteByID][WithTransaction][Update] failed to update entity")
 
@@ -388,11 +312,6 @@ func (s *GuestService) DeleteByID(ctx context.Context, requestDTO *dtos.DeleteGu
 		if errRollback != nil {
 			log.Err(errRollback).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-				Msg("[GuestService][DeleteByID][Rollback] failed to rollback transaction")
-			log.Debug().
-				Ctx(ctx).
-				Err(errRollback).
 				Fields(logFields).
 				Msg("[GuestService][DeleteByID][Rollback] failed to rollback transaction")
 		}
@@ -404,11 +323,6 @@ func (s *GuestService) DeleteByID(ctx context.Context, requestDTO *dtos.DeleteGu
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][DeleteByID][Update] failed to commit transaction")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[GuestService][DeleteByID][Update] failed to commit transaction")
 
@@ -416,11 +330,6 @@ func (s *GuestService) DeleteByID(ctx context.Context, requestDTO *dtos.DeleteGu
 		if errRollback != nil {
 			log.Err(errRollback).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-				Msg("[GuestService][DeleteByID][Rollback] failed to rollback transaction")
-			log.Debug().
-				Ctx(ctx).
-				Err(errRollback).
 				Fields(logFields).
 				Msg("[GuestService][DeleteByID][Rollback] failed to rollback transaction")
 		}
@@ -432,11 +341,6 @@ func (s *GuestService) DeleteByID(ctx context.Context, requestDTO *dtos.DeleteGu
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][DeleteByID][deleteEntityCaches] failed to delete caches")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[GuestService][DeleteByID][deleteEntityCaches] failed to delete caches")
 		err = nil
@@ -455,11 +359,6 @@ func (s *GuestService) DeleteByID(ctx context.Context, requestDTO *dtos.DeleteGu
 		)
 		if err != nil {
 			log.Err(err).
-				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-				Msg("[GuestService][DeleteByID][Publish] failed to publish message")
-			log.Debug().
-				Err(err).
 				Ctx(ctx).
 				Fields(logFields).
 				Msg("[GuestService][DeleteByID][Publish] failed to publish message")
@@ -485,7 +384,6 @@ func (s *GuestService) getListEntityCache(
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid":          custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"listEntityCacheKey": listEntityCacheKey,
 	}
 
@@ -494,15 +392,9 @@ func (s *GuestService) getListEntityCache(
 		if gocerr.GetErrorCode(err) >= http.StatusInternalServerError {
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
+				Fields(logFields).
 				Msg("[GuestService][getListEntityCache][GetList] failed to get list entity cache")
 		}
-
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
-			Fields(logFields).
-			Msg("[GuestService][getListEntityCache][GetList] failed to get list entity cache")
 		return nil, err
 	}
 	logFields["listEntity"] = listEntity
@@ -525,7 +417,6 @@ func (s *GuestService) setListEntityCache(
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid":          custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"listEntityCacheKey": listEntityCacheKey,
 		"listEntity":         listEntity,
 		"expiration":         s.cfg.Guest.Cache.Duration,
@@ -540,11 +431,6 @@ func (s *GuestService) setListEntityCache(
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][setListEntityCache][SetList] failed to set list entity cache")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[GuestService][setListEntityCache][SetList] failed to set list entity cache")
 		return err
@@ -572,7 +458,6 @@ func (s *GuestService) findListEntity(
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid":          custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"listEntityCacheKey": listEntityCacheKey,
 		"filter":             filter,
 		"sorts":              sorts,
@@ -586,15 +471,9 @@ func (s *GuestService) findListEntity(
 			if gocerr.GetErrorCode(err) >= http.StatusInternalServerError {
 				log.Err(err).
 					Ctx(ctx).
-					Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
+					Fields(logFields).
 					Msg("[GuestService][findListEntity][getListEntityCache] failed to find list entity cache")
 			}
-
-			log.Debug().
-				Ctx(ctx).
-				Err(err).
-				Fields(logFields).
-				Msg("[GuestService][findListEntity][getListEntityCache] failed to find list entity cache")
 			err = nil
 		}
 
@@ -614,11 +493,6 @@ func (s *GuestService) findListEntity(
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][findListEntity][FindAll] failed to find list entity")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[GuestService][findListEntity][FindAll] failed to find list entity")
 		return nil, err
@@ -634,11 +508,6 @@ func (s *GuestService) findListEntity(
 		if err != nil {
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-				Msg("[GuestService][findListEntity][setListEntityCache] failed to set list entity cache")
-			log.Debug().
-				Ctx(ctx).
-				Err(err).
 				Fields(logFields).
 				Msg("[GuestService][findListEntity][setListEntityCache] failed to set list entity cache")
 			err = nil
@@ -663,7 +532,6 @@ func (s *GuestService) getCountEntitiesCache(
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid":             custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"entitiesCountCacheKey": entitiesCountCacheKey,
 	}
 
@@ -672,15 +540,9 @@ func (s *GuestService) getCountEntitiesCache(
 		if gocerr.GetErrorCode(err) >= http.StatusInternalServerError {
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
+				Fields(logFields).
 				Msg("[GuestService][getCountEntitiesCache][GetCount] failed to get entities count cache")
 		}
-
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
-			Fields(logFields).
-			Msg("[GuestService][getCountEntitiesCache][GetCount] failed to get entities count cache")
 		return 0, err
 	}
 
@@ -702,7 +564,6 @@ func (s *GuestService) setEntitiesCountCache(
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid":             custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"entitiesCountCacheKey": entitiesCountCacheKey,
 		"entitiesCount":         entitiesCount,
 		"expiration":            s.cfg.Guest.Cache.Duration,
@@ -717,11 +578,6 @@ func (s *GuestService) setEntitiesCountCache(
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][setEntitiesCountCache][SetCount] failed to set entities count cache")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[GuestService][setEntitiesCountCache][SetCount] failed to set entities count cache")
 		return err
@@ -746,7 +602,6 @@ func (s *GuestService) countEntities(
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid":             custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"entitiesCountCacheKey": entitiesCountCacheKey,
 		"filter":                filter,
 	}
@@ -757,15 +612,10 @@ func (s *GuestService) countEntities(
 			if gocerr.GetErrorCode(err) >= http.StatusInternalServerError {
 				log.Err(err).
 					Ctx(ctx).
-					Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
+					Fields(logFields).
 					Msg("[GuestService][countEntities][getCountEntitiesCache] failed to get entities count cache")
 			}
 
-			log.Debug().
-				Ctx(ctx).
-				Err(err).
-				Fields(logFields).
-				Msg("[GuestService][countEntities][getCountEntitiesCache] failed to get entities count cache")
 			err = nil
 		}
 
@@ -783,15 +633,10 @@ func (s *GuestService) countEntities(
 		if gocerr.GetErrorCode(err) >= http.StatusInternalServerError {
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
+				Fields(logFields).
 				Msg("[GuestService][countEntities][Count] failed to count entities")
 		}
 
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
-			Fields(logFields).
-			Msg("[GuestService][countEntities][Count] failed to count entities")
 		return 0, err
 	}
 	logFields["entitiesCount"] = entitiesCount
@@ -805,11 +650,6 @@ func (s *GuestService) countEntities(
 		if err != nil {
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-				Msg("[GuestService][countEntities][setEntitiesCountCache] failed to set count entities cache")
-			log.Debug().
-				Ctx(ctx).
-				Err(err).
 				Fields(logFields).
 				Msg("[GuestService][countEntities][setEntitiesCountCache] failed to set count entities cache")
 			err = nil
@@ -844,18 +684,12 @@ func (s *GuestService) FindAll(ctx context.Context, requestDTO *dtos.FindAllGues
 	}
 
 	logFields = map[string]interface{}{
-		"requestid":  custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"requestDTO": requestDTO,
 	}
 
 	filter, sorts, err = requestDTO.ToFilterAndSorts()
 	if err != nil {
 		log.Warn().
-			Ctx(ctx).
-			Err(err).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][FindAll][ToFilter] failed to transform requestDTO into filter and sorts")
-		log.Debug().
 			Ctx(ctx).
 			Err(err).
 			Fields(logFields).
@@ -896,11 +730,6 @@ func (s *GuestService) FindAll(ctx context.Context, requestDTO *dtos.FindAllGues
 		if errRoutine != nil {
 			log.Err(errRoutine).
 				Ctx(errTaskCtx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-				Msg("[GuestService][FindAll][findListEntity] failed to find list entity")
-			log.Debug().
-				Ctx(errTaskCtx).
-				Err(errRoutine).
 				Fields(logFields).
 				Msg("[GuestService][FindAll][findListEntity] failed to find list entity")
 			return errRoutine
@@ -926,11 +755,6 @@ func (s *GuestService) FindAll(ctx context.Context, requestDTO *dtos.FindAllGues
 			log.WithLevel(logLevel).
 				Ctx(errTaskCtx).
 				Err(errRoutine).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-				Msg("[GuestService][FindAll][countEntities] failed to count entities")
-			log.Debug().
-				Ctx(errTaskCtx).
-				Err(errRoutine).
 				Fields(logFields).
 				Msg("[GuestService][FindAll][countEntities] failed to count entities")
 			return errRoutine
@@ -943,11 +767,6 @@ func (s *GuestService) FindAll(ctx context.Context, requestDTO *dtos.FindAllGues
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][FindAll][Wait] failed to find or count entities")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[GuestService][FindAll][Wait] failed to find or count entities")
 		return nil, err
@@ -970,8 +789,7 @@ func (s *GuestService) getEntityByIDCache(ctx context.Context, cacheKey string) 
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
-		"cacheKey":  cacheKey,
+		"cacheKey": cacheKey,
 	}
 
 	entity, err = s.guestCacheRepository.Get(ctx, cacheKey)
@@ -979,15 +797,10 @@ func (s *GuestService) getEntityByIDCache(ctx context.Context, cacheKey string) 
 		if gocerr.GetErrorCode(err) >= http.StatusInternalServerError {
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
+				Fields(logFields).
 				Msg("[GuestService][getEntityByIDCache][Get] failed to get entity by id cache")
 		}
 
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
-			Fields(logFields).
-			Msg("[GuestService][getEntityByIDCache][Get] failed to get entity by id cache")
 		return nil, err
 	}
 
@@ -1009,7 +822,6 @@ func (s *GuestService) setEntityByIDCache(
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid":  custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"cacheKey":   cacheKey,
 		"entity":     entity,
 		"expiration": s.cfg.Guest.Cache.Duration,
@@ -1019,11 +831,6 @@ func (s *GuestService) setEntityByIDCache(
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][setEntityByIDCache][Set] failed to set entity cache")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[GuestService][setEntityByIDCache][Set] failed to set entity cache")
 		return err
@@ -1048,9 +855,8 @@ func (s *GuestService) findEntityByID(
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
-		"cacheKey":  cacheKey,
-		"filter":    filter,
+		"cacheKey": cacheKey,
+		"filter":   filter,
 	}
 
 	if s.cfg.Guest.Cache.Enable {
@@ -1059,15 +865,10 @@ func (s *GuestService) findEntityByID(
 			if gocerr.GetErrorCode(err) >= http.StatusInternalServerError {
 				log.Err(err).
 					Ctx(ctx).
-					Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
+					Fields(logFields).
 					Msg("[GuestService][findEntityByID][getEntityByIDCache] failed to get entity by id cache")
 			}
 
-			log.Debug().
-				Ctx(ctx).
-				Err(err).
-				Fields(logFields).
-				Msg("[GuestService][findEntityByID][getEntityByIDCache] failed to get entity by id cache")
 			err = nil
 		}
 
@@ -1086,15 +887,10 @@ func (s *GuestService) findEntityByID(
 		if gocerr.GetErrorCode(err) >= http.StatusInternalServerError {
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
+				Fields(logFields).
 				Msg("[GuestService][findEntityByID][FindOne] failed to find entity")
 		}
 
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
-			Fields(logFields).
-			Msg("[GuestService][findEntityByID][FindOne] failed to find entity")
 		return nil, err
 	}
 	logFields["entity"] = entity
@@ -1108,11 +904,6 @@ func (s *GuestService) findEntityByID(
 		if err != nil {
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-				Msg("[GuestService][findEntityByID][setEntityByIDCache] failed to set entity by id cache")
-			log.Debug().
-				Ctx(ctx).
-				Err(err).
 				Fields(logFields).
 				Msg("[GuestService][findEntityByID][setEntityByIDCache] failed to set entity by id cache")
 			err = nil
@@ -1141,18 +932,12 @@ func (s *GuestService) FindByID(ctx context.Context, requestDTO *dtos.FindGuestB
 	}
 
 	logFields = map[string]interface{}{
-		"requestid":  custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"requestDTO": requestDTO,
 	}
 
 	err = requestDTO.Validate()
 	if err != nil {
 		log.Warn().
-			Ctx(ctx).
-			Err(err).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][FindByID][Validate] failed to validate dto")
-		log.Debug().
 			Ctx(ctx).
 			Err(err).
 			Fields(logFields).
@@ -1188,11 +973,6 @@ func (s *GuestService) FindByID(ctx context.Context, requestDTO *dtos.FindGuestB
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][FindByID][FindOne] failed to find entity by id")
-		log.Debug().
-			Err(err).
-			Ctx(ctx).
 			Fields(logFields).
 			Msg("[GuestService][FindByID][FindOne] failed to find entity by id")
 		return nil, err
@@ -1224,18 +1004,12 @@ func (s *GuestService) UpdateByID(ctx context.Context, requestDTO *dtos.UpdateGu
 	}
 
 	logFields = map[string]interface{}{
-		"requestid":  custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"requestDTO": requestDTO,
 	}
 
 	err = requestDTO.Validate()
 	if err != nil {
 		log.Warn().
-			Ctx(ctx).
-			Err(err).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][UpdateByID][Validate] failed to validate dto")
-		log.Debug().
 			Ctx(ctx).
 			Err(err).
 			Fields(logFields).
@@ -1275,11 +1049,6 @@ func (s *GuestService) UpdateByID(ctx context.Context, requestDTO *dtos.UpdateGu
 		log.WithLevel(logLevel).
 			Ctx(ctx).
 			Err(err).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][UpdateByID][FindOne] failed to find entity")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[GuestService][UpdateByID][FindOne] failed to find entity")
 		return nil, err
@@ -1292,11 +1061,6 @@ func (s *GuestService) UpdateByID(ctx context.Context, requestDTO *dtos.UpdateGu
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][UpdateByID][BeginTransaction] failed to begin transaction")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[GuestService][UpdateByID][BeginTransaction] failed to begin transaction")
 		return nil, err
@@ -1311,11 +1075,6 @@ func (s *GuestService) UpdateByID(ctx context.Context, requestDTO *dtos.UpdateGu
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][UpdateByID][WithTransaction][Update] failed to update entity")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[GuestService][UpdateByID][WithTransaction][Update] failed to update entity")
 
@@ -1323,11 +1082,6 @@ func (s *GuestService) UpdateByID(ctx context.Context, requestDTO *dtos.UpdateGu
 		if errRollback != nil {
 			log.Err(errRollback).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-				Msg("[GuestService][UpdateByID][Rollback] failed to rollback transaction")
-			log.Debug().
-				Ctx(ctx).
-				Err(errRollback).
 				Fields(logFields).
 				Msg("[GuestService][UpdateByID][Rollback] failed to rollback transaction")
 		}
@@ -1339,11 +1093,6 @@ func (s *GuestService) UpdateByID(ctx context.Context, requestDTO *dtos.UpdateGu
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][UpdateByID][Update] failed to commit transaction")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[GuestService][UpdateByID][Update] failed to commit transaction")
 
@@ -1351,11 +1100,6 @@ func (s *GuestService) UpdateByID(ctx context.Context, requestDTO *dtos.UpdateGu
 		if errRollback != nil {
 			log.Err(errRollback).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-				Msg("[GuestService][UpdateByID][Rollback] failed to rollback transaction")
-			log.Debug().
-				Ctx(ctx).
-				Err(errRollback).
 				Fields(logFields).
 				Msg("[GuestService][UpdateByID][Rollback] failed to rollback transaction")
 		}
@@ -1369,11 +1113,6 @@ func (s *GuestService) UpdateByID(ctx context.Context, requestDTO *dtos.UpdateGu
 	err = s.deleteEntityCaches(ctx)
 	if err != nil {
 		log.Err(err).
-			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][UpdateByID][deleteEntityCaches] failed to delete caches")
-		log.Debug().
-			Err(err).
 			Ctx(ctx).
 			Fields(logFields).
 			Msg("[GuestService][UpdateByID][deleteEntityCaches] failed to delete caches")
@@ -1394,11 +1133,6 @@ func (s *GuestService) UpdateByID(ctx context.Context, requestDTO *dtos.UpdateGu
 		if err != nil {
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-				Msg("[GuestService][UpdateByID][Publish] failed to publish message")
-			log.Debug().
-				Ctx(ctx).
-				Err(err).
 				Fields(logFields).
 				Msg("[GuestService][UpdateByID][Publish] failed to publish message")
 			err = nil
@@ -1425,7 +1159,6 @@ func (s *GuestService) ProcessEvent(ctx context.Context, requestDTO *dtos.GuestE
 	}
 
 	logFields = map[string]interface{}{
-		"requestid":  custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"requestDTO": requestDTO,
 	}
 
@@ -1436,11 +1169,6 @@ func (s *GuestService) ProcessEvent(ctx context.Context, requestDTO *dtos.GuestE
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[GuestService][ProcessEvent][SendWebhook] failed to send webhook")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[GuestService][ProcessEvent][SendWebhook] failed to send webhook")
 		return nil, err

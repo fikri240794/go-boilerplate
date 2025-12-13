@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"go-boilerplate/pkg/constants"
 	"go-boilerplate/transports/event_consumer/models/vms"
 	"net/http"
 
@@ -41,11 +40,6 @@ func (h *messageHandler) HandleMessage(m *nsq.Message) error {
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", string(m.ID[:])).
-			Msg("[messageHandler][HandleMessage][Unmarshal] failed to parse message body")
-		log.Debug().
-			Err(err).
-			Ctx(ctx).
 			Fields(logFields).
 			Msg("[messageHandler][HandleMessage][Unmarshal] failed to parse message body")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -53,8 +47,6 @@ func (h *messageHandler) HandleMessage(m *nsq.Message) error {
 	}
 
 	ctx = requestVM.ExtractTracerPropagator(ctx)
-
-	ctx = context.WithValue(ctx, constants.ContextKeyRequestID, string(m.ID[:]))
 
 	return h.handleMessageFunc(ctx, m)
 }

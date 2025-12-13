@@ -3,8 +3,6 @@ package middlewares
 import (
 	"context"
 	"fmt"
-	"go-boilerplate/pkg/constants"
-	custom_context "go-boilerplate/pkg/context"
 	"go-boilerplate/pkg/tracer"
 	"net/http"
 	"time"
@@ -59,7 +57,6 @@ func (mw *LogMiddleware) Log(
 	}
 
 	logFields = map[string]interface{}{
-		"requestid":         custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"req":               req,
 		"unary server info": info,
 		"res":               res,

@@ -4,8 +4,6 @@ import (
 	"context"
 	"go-boilerplate/datasources/event_producer"
 	"go-boilerplate/internal/models/entities"
-	"go-boilerplate/pkg/constants"
-	custom_context "go-boilerplate/pkg/context"
 	"go-boilerplate/pkg/tracer"
 	"net/http"
 	"time"
@@ -60,50 +58,29 @@ func (r *EventProducerRepository[TEntity]) Publish(
 	ctx, message = message.InjectTracerPropagator(ctx)
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
-		"topic":     topic,
-		"message":   message,
+		"topic":   topic,
+		"message": message,
 	}
 
 	bMessage, err = json.Marshal(message)
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[EventProducerRepository][Publish][Marshal] failed to marshal message")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[EventProducerRepository][Publish][Marshal] failed to marshal message")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
 		return err
 	}
-
-	log.Debug().
-		Ctx(ctx).
-		Fields(logFields).
-		Msg("[EventProducerRepository][Publish] publishing message")
 
 	err = r.eventProducer.NSQProducer.Publish(topic, bMessage)
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[EventProducerRepository][Publish][Publish] failed to publish message")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[EventProducerRepository][Publish][Publish] failed to publish message")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
 		return err
 	}
-
-	log.Debug().
-		Ctx(ctx).
-		Fields(logFields).
-		Msg("[EventProducerRepository][Publish] message published")
 
 	return nil
 }
@@ -127,51 +104,30 @@ func (r *EventProducerRepository[TEntity]) PublishWithDelay(
 	ctx, message = message.InjectTracerPropagator(ctx)
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
-		"topic":     topic,
-		"delay":     delay,
-		"message":   message,
+		"topic":   topic,
+		"delay":   delay,
+		"message": message,
 	}
 
 	bMessage, err = json.Marshal(message)
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[EventProducerRepository][PublishWithDelay][Marshal] failed to marshal message")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[EventProducerRepository][PublishWithDelay][Marshal] failed to marshal message")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
 		return err
 	}
-
-	log.Debug().
-		Ctx(ctx).
-		Fields(logFields).
-		Msg("[EventProducerRepository][PublishWithDelay] publishing message")
 
 	err = r.eventProducer.NSQProducer.DeferredPublish(topic, delay, bMessage)
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[EventProducerRepository][PublishWithDelay][DeferredPublish] failed to publish message")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[EventProducerRepository][PublishWithDelay][DeferredPublish] failed to publish message")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
 		return err
 	}
-
-	log.Debug().
-		Ctx(ctx).
-		Fields(logFields).
-		Msg("[EventProducerRepository][PublishWithDelay] message published")
 
 	return nil
 }

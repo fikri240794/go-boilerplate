@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"go-boilerplate/configs"
 	"go-boilerplate/datasources"
+	"go-boilerplate/pkg/logger"
 	"go-boilerplate/pkg/protobuf_boilerplate"
 	"go-boilerplate/transports/grpc/handlers"
 	"go-boilerplate/transports/grpc/middlewares"
@@ -99,7 +100,8 @@ func (s *GRPCServer) setGlobalLog() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{
 		Out:        os.Stderr,
 		TimeFormat: time.RFC3339,
-	})
+	}).
+		Hook(logger.NewContextHook())
 }
 
 func (s *GRPCServer) ServeGRPC() error {

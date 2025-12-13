@@ -5,8 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"go-boilerplate/datasources/boilerplate_database"
-	"go-boilerplate/pkg/constants"
-	custom_context "go-boilerplate/pkg/context"
 	"go-boilerplate/pkg/tracer"
 	"net/http"
 	"reflect"
@@ -48,19 +46,13 @@ func (r *boilerplateDatabaseStatement) Exec(ctx context.Context, args ...interfa
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
-		"args":      args,
+		"args": args,
 	}
 
 	_, err = r.stmt.ExecContext(ctx, args...)
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[boilerplateDatabaseStatement][Exec][ExecContext] failed to exec statement")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[boilerplateDatabaseStatement][Exec][ExecContext] failed to exec statement")
 		return err
@@ -80,19 +72,13 @@ func (r *boilerplateDatabaseStatement) Get(ctx context.Context, dest interface{}
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
-		"args":      args,
+		"args": args,
 	}
 
 	err = r.stmt.GetContext(ctx, dest, args...)
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[boilerplateDatabaseStatement][Get][GetContext] failed to get with statement")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[boilerplateDatabaseStatement][Get][GetContext] failed to get with statement")
 		return err
@@ -112,19 +98,13 @@ func (r *boilerplateDatabaseStatement) Select(ctx context.Context, dest interfac
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
-		"args":      args,
+		"args": args,
 	}
 
 	err = r.stmt.SelectContext(ctx, dest, args...)
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[boilerplateDatabaseStatement][Select][SelectContext] failed to select with statement")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[boilerplateDatabaseStatement][Select][SelectContext] failed to select with statement")
 		return err
@@ -175,8 +155,7 @@ func (r *boilerplateDatabaseTransaction) Prepare(ctx context.Context, query stri
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
-		"query":     query,
+		"query": query,
 	}
 
 	stmt, err = r.tx.PreparexContext(ctx, query)
@@ -330,9 +309,8 @@ func (r *BoilerplateDatabaseRepository[TEntity]) exec(ctx context.Context, query
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
-		"query":     query,
-		"args":      args,
+		"query": query,
+		"args":  args,
 	}
 
 	if r.tx != nil {
@@ -340,12 +318,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) exec(ctx context.Context, query
 		if err != nil {
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-				Str("query", query).
-				Msg("[BoilerplateDatabaseRepository][exec][Prepare] failed to prepare statement")
-			log.Debug().
-				Ctx(ctx).
-				Err(err).
 				Fields(logFields).
 				Msg("[BoilerplateDatabaseRepository][exec][Prepare] failed to prepare statement")
 			err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -356,12 +328,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) exec(ctx context.Context, query
 		if err != nil {
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-				Str("query", query).
-				Msg("[BoilerplateDatabaseRepository][exec][PreparexContext] failed to prepare statement")
-			log.Debug().
-				Ctx(ctx).
-				Err(err).
 				Fields(logFields).
 				Msg("[BoilerplateDatabaseRepository][exec][PreparexContext] failed to prepare statement")
 			err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -375,21 +341,10 @@ func (r *BoilerplateDatabaseRepository[TEntity]) exec(ctx context.Context, query
 		if errCloseStmt != nil {
 			log.Err(errCloseStmt).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-				Str("query", query).
-				Msg("[BoilerplateDatabaseRepository][exec][Close] failed to close statement")
-			log.Debug().
-				Ctx(ctx).
-				Err(errCloseStmt).
 				Fields(logFields).
 				Msg("[BoilerplateDatabaseRepository][exec][Close] failed to close statement")
 		}
 	}()
-
-	log.Debug().
-		Ctx(ctx).
-		Fields(logFields).
-		Msg("[BoilerplateDatabaseRepository][exec] query execution")
 
 	queryExecStartTime = time.Now()
 
@@ -397,12 +352,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) exec(ctx context.Context, query
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Str("query", query).
-			Msg("[BoilerplateDatabaseRepository][exec][Exec] failed to exec statement")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[BoilerplateDatabaseRepository][exec][Exec] failed to exec statement")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -416,16 +365,9 @@ func (r *BoilerplateDatabaseRepository[TEntity]) exec(ctx context.Context, query
 	if queryExecDuration > r.db.MasterMaxQueryDurationWarning {
 		log.Warn().
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Str("query", query).
-			Str("duration", fmt.Sprintf("%.3f ms", (float64(queryExecDuration)/float64(time.Millisecond)))).
+			Fields(logFields).
 			Msg("[BoilerplateDatabaseRepository][exec] slow query")
 	}
-
-	log.Debug().
-		Ctx(ctx).
-		Fields(logFields).
-		Msg("[BoilerplateDatabaseRepository][exec] query executed")
 
 	return nil
 }
@@ -446,9 +388,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) BeginTransaction(ctx context.Co
 		return r.tx, nil
 	}
 
-	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
-	}
+	logFields = map[string]interface{}{}
 
 	sqlxTx, err = r.db.Master.BeginTxx(ctx, nil)
 	if err != nil {
@@ -491,7 +431,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Count(
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"useMaster": useMaster,
 	}
 
@@ -518,11 +457,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Count(
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[BoilerplateDatabaseRepository][Count][ToSQLWithArgsWithAlias] failed to build select query")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[BoilerplateDatabaseRepository][Count][ToSQLWithArgsWithAlias] failed to build select query")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -537,12 +471,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Count(
 			if err != nil {
 				log.Err(err).
 					Ctx(ctx).
-					Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-					Str("query", query).
-					Msg("[BoilerplateDatabaseRepository][Count][Prepare] failed to prepare statement")
-				log.Debug().
-					Ctx(ctx).
-					Err(err).
 					Fields(logFields).
 					Msg("[BoilerplateDatabaseRepository][Count][Prepare] failed to prepare statement")
 				err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -553,12 +481,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Count(
 			if err != nil {
 				log.Err(err).
 					Ctx(ctx).
-					Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-					Str("query", query).
-					Msg("[BoilerplateDatabaseRepository][Count][PreparexContext] failed to prepare statement")
-				log.Debug().
-					Ctx(ctx).
-					Err(err).
 					Fields(logFields).
 					Msg("[BoilerplateDatabaseRepository][Count][PreparexContext] failed to prepare statement")
 				err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -572,12 +494,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Count(
 		if err != nil {
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-				Str("query", query).
-				Msg("[BoilerplateDatabaseRepository][Count][PreparexContext] failed to prepare statement")
-			log.Debug().
-				Ctx(ctx).
-				Err(err).
 				Fields(logFields).
 				Msg("[BoilerplateDatabaseRepository][Count][PreparexContext] failed to prepare statement")
 			err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -591,21 +507,10 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Count(
 		if errCloseStmt != nil {
 			log.Err(errCloseStmt).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-				Str("query", query).
-				Msg("[BoilerplateDatabaseRepository][Count][Close] failed to close statement")
-			log.Debug().
-				Ctx(ctx).
-				Err(errCloseStmt).
 				Fields(logFields).
 				Msg("[BoilerplateDatabaseRepository][Count][Close] failed to close statement")
 		}
 	}()
-
-	log.Debug().
-		Ctx(ctx).
-		Fields(logFields).
-		Msg("[BoilerplateDatabaseRepository][Count] query execution")
 
 	queryExecStartTime = time.Now()
 
@@ -616,12 +521,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Count(
 		} else {
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-				Str("query", query).
-				Msg("[BoilerplateDatabaseRepository][Count][Get] failed to count entities")
-			log.Debug().
-				Ctx(ctx).
-				Err(err).
 				Fields(logFields).
 				Msg("[BoilerplateDatabaseRepository][Count][Get] failed to count entities")
 			err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -637,16 +536,9 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Count(
 	if queryExecDuration > r.db.SlaveMaxQueryDurationWarning {
 		log.Warn().
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Str("query", query).
-			Str("duration", fmt.Sprintf("%.3f ms", (float64(queryExecDuration)/float64(time.Millisecond)))).
+			Fields(logFields).
 			Msg("[BoilerplateDatabaseRepository][Count] slow query")
 	}
-
-	log.Debug().
-		Ctx(ctx).
-		Fields(logFields).
-		Msg("[BoilerplateDatabaseRepository][Count] query executed")
 
 	return count, nil
 }
@@ -672,8 +564,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Create(ctx context.Context, ent
 	}
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
-		"entity":    entity,
+		"entity": entity,
 	}
 
 	table, mapFieldWithValue = r.getTableNameAndMapFieldWithValueFrom(entity)
@@ -691,11 +582,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Create(ctx context.Context, ent
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[BoilerplateDatabaseRepository][Create][ToSQLWithArgs] failed to build insert query")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[BoilerplateDatabaseRepository][Create][ToSQLWithArgs] failed to build insert query")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -708,12 +594,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Create(ctx context.Context, ent
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Str("query", query).
-			Msg("[BoilerplateDatabaseRepository][Create][exec] failed to create entity")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[BoilerplateDatabaseRepository][Create][exec] failed to create entity")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -738,9 +618,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Delete(ctx context.Context, fil
 	ctx, span = tracer.Start(ctx, "[BoilerplateDatabaseRepository][Delete]")
 	defer span.End()
 
-	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
-	}
+	logFields = map[string]interface{}{}
 
 	table, _ = r.getTableNameAndFields()
 
@@ -757,11 +635,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Delete(ctx context.Context, fil
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[BoilerplateDatabaseRepository][Delete][ToSQLWithArgs] failed to build delete query")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[BoilerplateDatabaseRepository][Delete][ToSQLWithArgs] failed to build delete query")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -774,12 +647,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Delete(ctx context.Context, fil
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Str("query", query).
-			Msg("[BoilerplateDatabaseRepository][Delete][exec] failed to delete entity")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[BoilerplateDatabaseRepository][Delete][exec] failed to delete entity")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -820,7 +687,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindAll(
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"useMaster": useMaster,
 	}
 
@@ -855,11 +721,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindAll(
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[BoilerplateDatabaseRepository][FindAll][ToSQLWithArgsWithAlias] failed to build select query")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[BoilerplateDatabaseRepository][FindAll][ToSQLWithArgsWithAlias] failed to build select query")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -874,12 +735,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindAll(
 			if err != nil {
 				log.Err(err).
 					Ctx(ctx).
-					Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-					Str("query", query).
-					Msg("[BoilerplateDatabaseRepository][FindAll][Prepare] failed to prepare statement")
-				log.Debug().
-					Ctx(ctx).
-					Err(err).
 					Fields(logFields).
 					Msg("[BoilerplateDatabaseRepository][FindAll][Prepare] failed to prepare statement")
 				err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -890,12 +745,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindAll(
 			if err != nil {
 				log.Err(err).
 					Ctx(ctx).
-					Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-					Str("query", query).
-					Msg("[BoilerplateDatabaseRepository][FindAll][PreparexContext] failed to prepare statement")
-				log.Debug().
-					Ctx(ctx).
-					Err(err).
 					Fields(logFields).
 					Msg("[BoilerplateDatabaseRepository][FindAll][PreparexContext] failed to prepare statement")
 				err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -909,12 +758,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindAll(
 		if err != nil {
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-				Str("query", query).
-				Msg("[BoilerplateDatabaseRepository][FindAll][PreparexContext] failed to prepare statement")
-			log.Debug().
-				Ctx(ctx).
-				Err(err).
 				Fields(logFields).
 				Msg("[BoilerplateDatabaseRepository][FindAll][PreparexContext] failed to prepare statement")
 			err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -928,21 +771,10 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindAll(
 		if errCloseStmt != nil {
 			log.Err(errCloseStmt).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-				Str("query", query).
-				Msg("[BoilerplateDatabaseRepository][FindAll][Close] failed to close statement")
-			log.Debug().
-				Ctx(ctx).
-				Err(errCloseStmt).
 				Fields(logFields).
 				Msg("[BoilerplateDatabaseRepository][FindAll][Close] failed to close statement")
 		}
 	}()
-
-	log.Debug().
-		Ctx(ctx).
-		Fields(logFields).
-		Msg("[BoilerplateDatabaseRepository][FindAll] query execution")
 
 	queryExecStartTime = time.Now()
 
@@ -951,12 +783,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindAll(
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Str("query", query).
-			Msg("[BoilerplateDatabaseRepository][FindAll][Select] failed to select entities")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[BoilerplateDatabaseRepository][FindAll][Select] failed to select entities")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -970,16 +796,9 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindAll(
 	if queryExecDuration > r.db.SlaveMaxQueryDurationWarning {
 		log.Warn().
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Str("query", query).
-			Str("duration", fmt.Sprintf("%.3f ms", (float64(queryExecDuration)/float64(time.Millisecond)))).
+			Fields(logFields).
 			Msg("[BoilerplateDatabaseRepository][FindAll] slow query")
 	}
-
-	log.Debug().
-		Ctx(ctx).
-		Fields(logFields).
-		Msg("[BoilerplateDatabaseRepository][FindAll] query executed")
 
 	return entities, nil
 }
@@ -1013,7 +832,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 	defer span.End()
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
 		"useMaster": useMaster,
 	}
 
@@ -1047,11 +865,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[BoilerplateDatabaseRepository][FindOne][ToSQLWithArgsWithAlias] failed to build select query")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[BoilerplateDatabaseRepository][FindOne][ToSQLWithArgsWithAlias] failed to build select query")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -1066,13 +879,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 			if err != nil {
 				log.Err(err).
 					Ctx(ctx).
-					Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-					Str("query", query).
-					Msg("[BoilerplateDatabaseRepository][FindOne][Prepare] failed to prepare statement")
-				log.Debug().
-					Ctx(ctx).
-					Err(err).
-					Fields(fields).
+					Fields(logFields).
 					Msg("[BoilerplateDatabaseRepository][FindOne][Prepare] failed to prepare statement")
 				err = gocerr.New(http.StatusInternalServerError, err.Error())
 				return nil, err
@@ -1082,13 +889,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 			if err != nil {
 				log.Err(err).
 					Ctx(ctx).
-					Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-					Str("query", query).
-					Msg("[BoilerplateDatabaseRepository][FindOne][PreparexContext] failed to prepare statement")
-				log.Debug().
-					Ctx(ctx).
-					Err(err).
-					Fields(fields).
+					Fields(logFields).
 					Msg("[BoilerplateDatabaseRepository][FindOne][PreparexContext] failed to prepare statement")
 				err = gocerr.New(http.StatusInternalServerError, err.Error())
 				return nil, err
@@ -1101,13 +902,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 		if err != nil {
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-				Str("query", query).
-				Msg("[BoilerplateDatabaseRepository][FindOne][PreparexContext] failed to prepare statement")
-			log.Debug().
-				Ctx(ctx).
-				Err(err).
-				Fields(fields).
+				Fields(logFields).
 				Msg("[BoilerplateDatabaseRepository][FindOne][PreparexContext] failed to prepare statement")
 			err = gocerr.New(http.StatusInternalServerError, err.Error())
 			return nil, err
@@ -1120,21 +915,10 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 		if errCloseStmt != nil {
 			log.Err(errCloseStmt).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-				Str("query", query).
-				Msg("[BoilerplateDatabaseRepository][FindOne][Close] failed to close statement")
-			log.Debug().
-				Ctx(ctx).
-				Err(errCloseStmt).
 				Fields(logFields).
 				Msg("[BoilerplateDatabaseRepository][FindOne][Close] failed to close statement")
 		}
 	}()
-
-	log.Debug().
-		Ctx(ctx).
-		Fields(logFields).
-		Msg("[BoilerplateDatabaseRepository][FindOne] query execution")
 
 	queryExecStartTime = time.Now()
 
@@ -1146,13 +930,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 		} else {
 			log.Err(err).
 				Ctx(ctx).
-				Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-				Str("query", query).
-				Msg("[BoilerplateDatabaseRepository][FindOne][GetContext] failed to select entity")
-			log.Debug().
-				Ctx(ctx).
-				Err(err).
-				Fields(fields).
+				Fields(logFields).
 				Msg("[BoilerplateDatabaseRepository][FindOne][GetContext] failed to select entity")
 			err = gocerr.New(http.StatusInternalServerError, err.Error())
 		}
@@ -1167,16 +945,9 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 	if queryExecDuration > r.db.SlaveMaxQueryDurationWarning {
 		log.Warn().
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Str("query", query).
-			Str("duration", fmt.Sprintf("%.3f ms", (float64(queryExecDuration)/float64(time.Millisecond)))).
+			Fields(logFields).
 			Msg("[BoilerplateDatabaseRepository][FindOne] slow query")
 	}
-
-	log.Debug().
-		Ctx(ctx).
-		Fields(logFields).
-		Msg("[BoilerplateDatabaseRepository][FindOne] query executed")
 
 	return entity, nil
 }
@@ -1202,8 +973,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Update(ctx context.Context, ent
 	}
 
 	logFields = map[string]interface{}{
-		"requestid": custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID),
-		"entity":    entity,
+		"entity": entity,
 	}
 
 	table, mapFieldWithValues = r.getTableNameAndMapFieldWithValueFrom(entity)
@@ -1222,11 +992,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Update(ctx context.Context, ent
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Msg("[BoilerplateDatabaseRepository][Update][ToSQLWithArgs] failed to build update query")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[BoilerplateDatabaseRepository][Update][ToSQLWithArgs] failed to build update query")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
@@ -1240,12 +1005,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Update(ctx context.Context, ent
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
-			Str("requestid", custom_context.GetCtxValueSafely[string](ctx, constants.ContextKeyRequestID)).
-			Str("query", query).
-			Msg("[BoilerplateDatabaseRepository][Update][exec] failed to update entity")
-		log.Debug().
-			Ctx(ctx).
-			Err(err).
 			Fields(logFields).
 			Msg("[BoilerplateDatabaseRepository][Update][exec] failed to update entity")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())

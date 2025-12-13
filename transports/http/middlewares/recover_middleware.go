@@ -4,9 +4,6 @@ import (
 	"fmt"
 	"runtime/debug"
 
-	"go-boilerplate/pkg/constants"
-	custom_context "go-boilerplate/pkg/context"
-
 	"github.com/fikri240794/gocerr"
 	"github.com/fikri240794/gores"
 	"github.com/gofiber/fiber/v2"
@@ -37,7 +34,6 @@ func (mw *RecoverMiddleware) Recover(c *fiber.Ctx) error {
 				JSON(responseVM)
 
 			logFields = map[string]interface{}{
-				"requestid":            custom_context.GetCtxValueSafely[string](c.UserContext(), constants.ContextKeyRequestID),
 				"path":                 c.Path(),
 				"method":               c.Method(),
 				"request headers":      c.GetReqHeaders(),
@@ -48,7 +44,7 @@ func (mw *RecoverMiddleware) Recover(c *fiber.Ctx) error {
 				"response body":        string(c.Response().Body()),
 			}
 
-			log.Debug().
+			log.Error().
 				Err(err).
 				Ctx(c.UserContext()).
 				Fields(logFields).

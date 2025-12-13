@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"go-boilerplate/pkg/constants"
+
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
@@ -189,6 +191,37 @@ func TestEventRequestVM_ExtractTracerPropagator(t *testing.T) {
 				assert.NotNil(t, resultCtx)
 				spanCtx := trace.SpanContextFromContext(resultCtx)
 				assert.True(t, spanCtx.IsValid())
+			},
+		},
+		{
+			name: "should_extract_requestid_from_tracer_propagator",
+			setupVM: func() *EventRequestVM[string] {
+				return &EventRequestVM[string]{
+					TracerPropagator: map[string]string{
+						"traceparent":                         "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+						string(constants.ContextKeyRequestID): "test-request-123",
+					},
+					Name:    "test_event",
+					Message: stringPtr("test message"),
+				}
+			},
+			setupContext: func() context.Context {
+				return context.Background()
+			},
+			setupPropagator: func() {
+				otel.SetTextMapPropagator(propagation.TraceContext{})
+			},
+			validate: func(t *testing.T, resultCtx context.Context) {
+				assert.NotNil(t, resultCtx)
+
+				// Check that span context is extracted
+				spanCtx := trace.SpanContextFromContext(resultCtx)
+				assert.True(t, spanCtx.IsValid())
+
+				// Check that requestid is extracted into context
+				requestID := resultCtx.Value(constants.ContextKeyRequestID)
+				assert.NotNil(t, requestID)
+				assert.Equal(t, "test-request-123", requestID)
 			},
 		},
 	}

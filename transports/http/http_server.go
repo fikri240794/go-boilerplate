@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"go-boilerplate/configs"
 	"go-boilerplate/datasources"
+	"go-boilerplate/pkg/logger"
 	"go-boilerplate/transports/http/handlers"
 	"go-boilerplate/transports/http/middlewares"
 	"os"
@@ -122,7 +123,8 @@ func (s *HTTPServer) setGlobalLog() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{
 		Out:        os.Stderr,
 		TimeFormat: time.RFC3339,
-	})
+	}).
+		Hook(logger.NewContextHook())
 }
 
 func (s *HTTPServer) setupGlobalMiddlewares() {
