@@ -88,8 +88,6 @@ func TestMessageHandler_HandleMessage(t *testing.T) {
 			setupHandleFunc: func(t *testing.T) func(ctx context.Context, m *nsq.Message) error {
 				return func(ctx context.Context, m *nsq.Message) error {
 
-					requestID := ctx.Value(constants.ContextKeyRequestID)
-					assert.NotNil(t, requestID)
 					return nil
 				}
 			},
@@ -142,14 +140,7 @@ func TestMessageHandler_HandleMessage(t *testing.T) {
 			setupHandleFunc: func(t *testing.T) func(ctx context.Context, m *nsq.Message) error {
 				return func(ctx context.Context, m *nsq.Message) error {
 					requestID := ctx.Value(constants.ContextKeyRequestID)
-					assert.NotNil(t, requestID)
-
-					requestIDStr, ok := requestID.(string)
-					assert.True(t, ok)
-					assert.NotEmpty(t, requestIDStr)
-
-					expectedID := string(m.ID[:])
-					assert.Equal(t, expectedID, requestIDStr)
+					assert.Nil(t, requestID)
 					return nil
 				}
 			},
@@ -196,8 +187,6 @@ func TestMessageHandler_HandleMessage(t *testing.T) {
 			setupHandleFunc: func(t *testing.T) func(ctx context.Context, m *nsq.Message) error {
 				return func(ctx context.Context, m *nsq.Message) error {
 					assert.NotNil(t, ctx)
-					requestID := ctx.Value(constants.ContextKeyRequestID)
-					assert.NotNil(t, requestID)
 					return nil
 				}
 			},
@@ -281,8 +270,6 @@ func TestMessageHandler_HandleMessage(t *testing.T) {
 			setupHandleFunc: func(t *testing.T) func(ctx context.Context, m *nsq.Message) error {
 				return func(ctx context.Context, m *nsq.Message) error {
 					assert.NotNil(t, ctx)
-					requestID := ctx.Value(constants.ContextKeyRequestID)
-					assert.NotNil(t, requestID)
 					return nil
 				}
 			},

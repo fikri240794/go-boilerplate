@@ -18,7 +18,10 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-//go:generate go run github.com/vektra/mockery/v2 --name IWebhookSiteRepository --structname WebhookSiteRepositoryMock --filename webhook_site_repository_mock.go
+//mockery:generate: true
+//mockery:structname: WebhookSiteRepositoryMock
+//mockery:filename: webhook_site_repository_mock.go
+//mockery:output: internal/repositories/mocks/
 type IWebhookSiteRepository interface {
 	SendWebhook(ctx context.Context, requestData *entities.GuestEventEntity) error
 }

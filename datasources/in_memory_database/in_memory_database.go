@@ -9,7 +9,10 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-//go:generate go run github.com/vektra/mockery/v2 --name IRedisTracer --structname RedisTracerMock --filename redis_tracer_mock.go
+//mockery:generate: true
+//mockery:structname: RedisTracerMock
+//mockery:filename: redis_tracer_mock.go
+//mockery:output: datasources/in_memory_database/mocks/
 type IRedisTracer interface {
 	InstrumentTracing(client *redis.Client) error
 }
@@ -20,7 +23,10 @@ var defaultRedisTracer redisTracer = func(client *redis.Client) error {
 	return redisotel.InstrumentTracing(client)
 }
 
-//go:generate go run github.com/vektra/mockery/v2 --name IRedisClient --structname RedisClientMock --filename redis_client_mock.go
+//mockery:generate: true
+//mockery:structname: RedisClientMock
+//mockery:filename: redis_client_mock.go
+//mockery:output: datasources/in_memory_database/mocks/
 type IRedisClient interface {
 	Close() error
 	Del(ctx context.Context, keys ...string) *redis.IntCmd

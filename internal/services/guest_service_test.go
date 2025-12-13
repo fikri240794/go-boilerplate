@@ -124,7 +124,9 @@ func Test_GuestService_deleteEntityCaches(t *testing.T) {
 
 				mockCache := repo_mocks.NewGuestCacheRepositoryMock(t)
 				mockCache.On("Keys", mock.Anything, "guest:*").Return([]string{"guest:key1", "guest:key2"}, nil)
-				mockCache.On("Delete", mock.Anything, "guest:key1", "guest:key2").Return(nil)
+				mockCache.On("Delete", mock.Anything, mock.MatchedBy(func(keys []string) bool {
+					return len(keys) == 2 && keys[0] == "guest:key1" && keys[1] == "guest:key2"
+				})).Return(nil)
 
 				return NewGuestService(
 					cfg,
@@ -197,7 +199,9 @@ func Test_GuestService_deleteEntityCaches(t *testing.T) {
 
 				mockCache := repo_mocks.NewGuestCacheRepositoryMock(t)
 				mockCache.On("Keys", mock.Anything, "guest:*").Return([]string{"guest:key1"}, nil)
-				mockCache.On("Delete", mock.Anything, "guest:key1").Return(errors.New("redis delete error"))
+				mockCache.On("Delete", mock.Anything, mock.MatchedBy(func(keys []string) bool {
+					return len(keys) == 1 && keys[0] == "guest:key1"
+				})).Return(errors.New("redis delete error"))
 
 				return NewGuestService(
 					cfg,
@@ -529,7 +533,9 @@ func Test_GuestService_Create(t *testing.T) {
 
 				mockCache := repo_mocks.NewGuestCacheRepositoryMock(t)
 				mockCache.On("Keys", mock.Anything, "guest:*").Return([]string{"guest:key1"}, nil)
-				mockCache.On("Delete", mock.Anything, "guest:key1").Return(errors.New("cache delete error"))
+				mockCache.On("Delete", mock.Anything, mock.MatchedBy(func(keys []string) bool {
+					return len(keys) == 1 && keys[0] == "guest:key1"
+				})).Return(errors.New("cache delete error"))
 
 				mockTx := repo_mocks.NewBoilerplateDatabaseTransactionMock(t)
 				mockTx.On("Commit").Return(nil)
@@ -1059,7 +1065,9 @@ func Test_GuestService_DeleteByID(t *testing.T) {
 
 				mockCacheRepo := repo_mocks.NewGuestCacheRepositoryMock(t)
 				mockCacheRepo.On("Keys", mock.Anything, "guest:*").Return([]string{"guest:key1"}, nil)
-				mockCacheRepo.On("Delete", mock.Anything, "guest:key1").Return(errors.New("cache delete error"))
+				mockCacheRepo.On("Delete", mock.Anything, mock.MatchedBy(func(keys []string) bool {
+					return len(keys) == 1 && keys[0] == "guest:key1"
+				})).Return(errors.New("cache delete error"))
 
 				return NewGuestService(
 					cfg,

@@ -17,7 +17,10 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-//go:generate go run github.com/vektra/mockery/v2 --name IBoilerplateDatabaseStatement --structname BoilerplateDatabaseStatementMock --filename boilerplate_database_statement_mock.go
+//mockery:generate: true
+//mockery:structname: BoilerplateDatabaseStatementMock
+//mockery:filename: boilerplate_database_statement_mock.go
+//mockery:output: internal/repositories/mocks/
 type IBoilerplateDatabaseStatement interface {
 	Exec(ctx context.Context, args ...interface{}) error
 	Get(ctx context.Context, dest interface{}, args ...interface{}) error
@@ -117,7 +120,10 @@ func (r *boilerplateDatabaseStatement) Close() error {
 	return r.stmt.Stmt.Close()
 }
 
-//go:generate go run github.com/vektra/mockery/v2 --name IBoilerplateDatabaseTransaction --structname BoilerplateDatabaseTransactionMock --filename boilerplate_database_transaction_mock.go
+//mockery:generate: true
+//mockery:structname: BoilerplateDatabaseTransactionMock
+//mockery:filename: boilerplate_database_transaction_mock.go
+//mockery:output: internal/repositories/mocks/
 type IBoilerplateDatabaseTransaction interface {
 	Commit() error
 	DriverName() string
@@ -181,7 +187,10 @@ func (r *boilerplateDatabaseTransaction) Rollback() error {
 	return nil
 }
 
-//go:generate go run github.com/vektra/mockery/v2 --name IBoilerplateDatabaseRepository --structname BoilerplateDatabaseRepositoryMock --filename boilerplate_database_repository_mock.go
+//mockery:generate: true
+//mockery:structname: BoilerplateDatabaseRepositoryMock
+//mockery:filename: boilerplate_database_repository_mock.go
+//mockery:output: internal/repositories/mocks/
 type IBoilerplateDatabaseRepository[TEntity interface{}] interface {
 	BeginTransaction(ctx context.Context) (IBoilerplateDatabaseTransaction, error)
 

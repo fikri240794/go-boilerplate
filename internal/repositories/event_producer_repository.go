@@ -14,7 +14,10 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-//go:generate go run github.com/vektra/mockery/v2 --name IEventProducerRepository --structname EventProducerRepositoryMock --filename event_producer_repository_mock.go
+//mockery:generate: true
+//mockery:structname: EventProducerRepositoryMock
+//mockery:filename: event_producer_repository_mock.go
+//mockery:output: internal/repositories/mocks/
 type IEventProducerRepository[TEntity interface{}] interface {
 	Publish(
 		ctx context.Context,

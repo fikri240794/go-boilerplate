@@ -7,7 +7,10 @@ import (
 	"github.com/nsqio/go-nsq"
 )
 
-//go:generate go run github.com/vektra/mockery/v2 --name INSQProducer --structname NSQProducerMock --filename nsq_producer_mock.go
+//mockery:generate: true
+//mockery:structname: NSQProducerMock
+//mockery:filename: nsq_producer_mock.go
+//mockery:output: datasources/event_producer/mocks/
 type INSQProducer interface {
 	Ping() error
 	Stop()

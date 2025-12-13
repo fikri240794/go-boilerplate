@@ -1,10 +1,10 @@
 clean:
-	@find . -name *mock* -delete
+	@find . -name *mock*.go -delete
 	@find . -name wire_gen.go -delete
 	@rm -rf ./transports/http/docs/swagger
 
 generate:
-	go generate ./...
+	go generate ./... && go run github.com/vektra/mockery/v3
 
 test: clean generate
 	go test -v -cover -covermode=atomic ./...

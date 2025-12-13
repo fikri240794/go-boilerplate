@@ -5,7 +5,10 @@ import (
 	"go-boilerplate/internal/models/entities"
 )
 
-//go:generate go run github.com/vektra/mockery/v2 --name IGuestRepository --structname GuestRepositoryMock --filename guest_repository_mock.go
+//mockery:generate: true
+//mockery:structname: GuestRepositoryMock
+//mockery:filename: guest_repository_mock.go
+//mockery:output: internal/repositories/mocks/
 type IGuestRepository interface {
 	IBoilerplateDatabaseRepository[entities.GuestEntity]
 

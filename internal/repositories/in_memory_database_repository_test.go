@@ -70,7 +70,9 @@ func Test_InMemoryDatabaseRepository_Delete(t *testing.T) {
 				mockRedis := in_memory_database_mocks.NewRedisClientMock(t)
 				cmd := redis.NewIntCmd(context.Background())
 				cmd.SetVal(2)
-				mockRedis.On("Del", mock.Anything, "key1", "key2").Return(cmd)
+				mockRedis.On("Del", mock.Anything, mock.MatchedBy(func(keys []string) bool {
+					return len(keys) == 2 && keys[0] == "key1" && keys[1] == "key2"
+				})).Return(cmd)
 				return NewInMemoryDatabaseRepository[testInMemoryEntity](&in_memory_database.InMemoryDatabase{
 					RedisClient: mockRedis,
 				})
@@ -84,7 +86,9 @@ func Test_InMemoryDatabaseRepository_Delete(t *testing.T) {
 				mockRedis := in_memory_database_mocks.NewRedisClientMock(t)
 				cmd := redis.NewIntCmd(context.Background())
 				cmd.SetErr(redis.TxFailedErr)
-				mockRedis.On("Del", mock.Anything, "key1").Return(cmd)
+				mockRedis.On("Del", mock.Anything, mock.MatchedBy(func(keys []string) bool {
+					return len(keys) == 1 && keys[0] == "key1"
+				})).Return(cmd)
 				return NewInMemoryDatabaseRepository[testInMemoryEntity](&in_memory_database.InMemoryDatabase{
 					RedisClient: mockRedis,
 				})
@@ -831,7 +835,9 @@ func Test_InMemoryDatabaseRepository_Unlock(t *testing.T) {
 				mockRedis := in_memory_database_mocks.NewRedisClientMock(t)
 				cmd := redis.NewIntCmd(context.Background())
 				cmd.SetVal(1)
-				mockRedis.On("Del", mock.Anything, "lock_key").Return(cmd)
+				mockRedis.On("Del", mock.Anything, mock.MatchedBy(func(keys []string) bool {
+					return len(keys) == 1 && keys[0] == "lock_key"
+				})).Return(cmd)
 				return NewInMemoryDatabaseRepository[testInMemoryEntity](&in_memory_database.InMemoryDatabase{
 					RedisClient: mockRedis,
 				})
@@ -848,7 +854,9 @@ func Test_InMemoryDatabaseRepository_Unlock(t *testing.T) {
 				mockRedis := in_memory_database_mocks.NewRedisClientMock(t)
 				cmd := redis.NewIntCmd(context.Background())
 				cmd.SetErr(redis.TxFailedErr)
-				mockRedis.On("Del", mock.Anything, "error_lock_key").Return(cmd)
+				mockRedis.On("Del", mock.Anything, mock.MatchedBy(func(keys []string) bool {
+					return len(keys) == 1 && keys[0] == "error_lock_key"
+				})).Return(cmd)
 				return NewInMemoryDatabaseRepository[testInMemoryEntity](&in_memory_database.InMemoryDatabase{
 					RedisClient: mockRedis,
 				})
