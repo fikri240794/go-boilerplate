@@ -125,21 +125,24 @@ func (s *GuestService) withTransaction(
 		return err
 	}
 
+	defer func() {
+		if err != nil {
+			errRollback = tx.Rollback()
+			if errRollback != nil {
+				log.Err(errRollback).
+					Ctx(ctx).
+					Fields(logFields).
+					Msg(fmt.Sprintf("[GuestService][%s][Rollback] failed to rollback transaction", fnName))
+			}
+		}
+	}()
+
 	err = fn(tx)
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
 			Fields(logFields).
 			Msg(fmt.Sprintf("[GuestService][%s][WithTransaction] failed to execute operation", fnName))
-
-		errRollback = tx.Rollback()
-		if errRollback != nil {
-			log.Err(errRollback).
-				Ctx(ctx).
-				Fields(logFields).
-				Msg(fmt.Sprintf("[GuestService][%s][Rollback] failed to rollback transaction", fnName))
-		}
-
 		return err
 	}
 
@@ -149,47 +152,33 @@ func (s *GuestService) withTransaction(
 			Ctx(ctx).
 			Fields(logFields).
 			Msg(fmt.Sprintf("[GuestService][%s][Commit] failed to commit transaction", fnName))
-
-		errRollback = tx.Rollback()
-		if errRollback != nil {
-			log.Err(errRollback).
-				Ctx(ctx).
-				Fields(logFields).
-				Msg(fmt.Sprintf("[GuestService][%s][Rollback] failed to rollback transaction", fnName))
-		}
-
 		return err
 	}
 
 	return nil
 }
 
-func (s *GuestService) buildActiveEntityFilterByID(id string) *goqube.Filter {
-	return &goqube.Filter{
-		Logic: goqube.LogicAnd,
-		Filters: []goqube.Filter{
-			{
-				Field:    goqube.Field{Column: entities.GuestEntityDatabaseFieldID},
-				Operator: goqube.OperatorEqual,
-				Value:    goqube.FilterValue{Value: id},
-			},
-			{
-				Field:    goqube.Field{Column: entities.GuestEntityDatabaseFieldDeletedAt},
-				Operator: goqube.OperatorIsNull,
-				Value:    goqube.FilterValue{Value: nil},
-			},
-		},
-	}
-}
+func (s *GuestService) buildActiveEntityFilterByIDs(ids ...string) *goqube.Filter {
+	var (
+		operator goqube.Operator
+		value    interface{}
+	)
 
-func (s *GuestService) buildActiveEntityFilterByIDs(ids []string) *goqube.Filter {
+	if len(ids) == 1 {
+		operator = goqube.OperatorEqual
+		value = ids[0]
+	} else {
+		operator = goqube.OperatorIn
+		value = ids
+	}
+
 	return &goqube.Filter{
 		Logic: goqube.LogicAnd,
 		Filters: []goqube.Filter{
 			{
 				Field:    goqube.Field{Column: entities.GuestEntityDatabaseFieldID},
-				Operator: goqube.OperatorIn,
-				Value:    goqube.FilterValue{Value: ids},
+				Operator: operator,
+				Value:    goqube.FilterValue{Value: value},
 			},
 			{
 				Field:    goqube.Field{Column: entities.GuestEntityDatabaseFieldDeletedAt},
@@ -212,46 +201,16 @@ func (s *GuestService) tryDeleteEntityCaches(ctx context.Context, logFields map[
 	}
 }
 
-func (s *GuestService) publishSingleEvent(
+func (s *GuestService) publishEvent(
 	ctx context.Context,
 	logFields map[string]interface{},
 	enable bool,
 	topic string,
-	entity *entities.GuestEntity,
 	fnName string,
+	entities_ ...entities.GuestEntity,
 ) {
 	var (
-		eventEntity *entities.EventEntity[entities.GuestEventEntity]
-		err         error
-	)
-
-	if !enable {
-		return
-	}
-
-	logFields["eventTopic"] = topic
-
-	eventEntity = entities.NewEventEntity(topic, entities.NewGuestEventEntity(entity))
-	logFields["eventEntity"] = eventEntity
-
-	err = s.guestEventProducerRepository.Publish(ctx, topic, eventEntity)
-	if err != nil {
-		log.Err(err).
-			Ctx(ctx).
-			Fields(logFields).
-			Msg(fmt.Sprintf("[GuestService][%s][Publish] failed to publish message", fnName))
-	}
-}
-
-func (s *GuestService) publishBulkEvent(
-	ctx context.Context,
-	logFields map[string]interface{},
-	enable bool,
-	topic string,
-	entities_ []entities.GuestEntity,
-	fnName string,
-) {
-	var (
+		eventEntity   *entities.EventEntity[entities.GuestEventEntity]
 		eventEntities []entities.GuestEventEntity
 		err           error
 	)
@@ -261,6 +220,20 @@ func (s *GuestService) publishBulkEvent(
 	}
 
 	logFields["eventTopic"] = topic
+
+	if len(entities_) == 1 {
+		eventEntity = entities.NewEventEntity(topic, entities.NewGuestEventEntity(&entities_[0]))
+		logFields["eventEntity"] = eventEntity
+
+		err = s.guestEventProducerRepository.Publish(ctx, topic, eventEntity)
+		if err != nil {
+			log.Err(err).
+				Ctx(ctx).
+				Fields(logFields).
+				Msg(fmt.Sprintf("[GuestService][%s][Publish] failed to publish message", fnName))
+		}
+		return
+	}
 
 	for i := range entities_ {
 		eventEntities = append(eventEntities, *entities.NewGuestEventEntity(&entities_[i]))
@@ -324,7 +297,7 @@ func (s *GuestService) Create(ctx context.Context, requestDTO *dtos.CreateGuestR
 	logFields["responseDTO"] = responseDTO
 
 	s.tryDeleteEntityCaches(ctx, logFields, "Create")
-	s.publishSingleEvent(ctx, logFields, s.cfg.Guest.Event.Created.Enable, s.cfg.Guest.Event.Created.Topic, entity, "Create")
+	s.publishEvent(ctx, logFields, s.cfg.Guest.Event.Created.Enable, s.cfg.Guest.Event.Created.Topic, "Create", *entity)
 
 	return responseDTO, nil
 }
@@ -360,7 +333,7 @@ func (s *GuestService) DeleteByID(ctx context.Context, requestDTO *dtos.DeleteGu
 		return err
 	}
 
-	filter = s.buildActiveEntityFilterByID(requestDTO.ID)
+	filter = s.buildActiveEntityFilterByIDs(requestDTO.ID)
 	logFields["filter"] = filter
 
 	entity, err = s.guestRepository.FindOne(ctx, filter, nil, false)
@@ -389,7 +362,7 @@ func (s *GuestService) DeleteByID(ctx context.Context, requestDTO *dtos.DeleteGu
 	}
 
 	s.tryDeleteEntityCaches(ctx, logFields, "DeleteByID")
-	s.publishSingleEvent(ctx, logFields, s.cfg.Guest.Event.Deleted.Enable, s.cfg.Guest.Event.Deleted.Topic, entity, "DeleteByID")
+	s.publishEvent(ctx, logFields, s.cfg.Guest.Event.Deleted.Enable, s.cfg.Guest.Event.Deleted.Topic, "DeleteByID", *entity)
 
 	return nil
 }
@@ -973,7 +946,7 @@ func (s *GuestService) FindByID(ctx context.Context, requestDTO *dtos.FindGuestB
 	cacheKey = fmt.Sprintf(s.cfg.Guest.Cache.Keyf, requestDTO.ID)
 	logFields["cacheKey"] = cacheKey
 
-	filter = s.buildActiveEntityFilterByID(requestDTO.ID)
+	filter = s.buildActiveEntityFilterByIDs(requestDTO.ID)
 	logFields["filter"] = filter
 
 	entity, err = s.findEntityByID(ctx, cacheKey, filter)
@@ -1022,7 +995,7 @@ func (s *GuestService) UpdateByID(ctx context.Context, requestDTO *dtos.UpdateGu
 		return nil, err
 	}
 
-	filter = s.buildActiveEntityFilterByID(requestDTO.ID)
+	filter = s.buildActiveEntityFilterByIDs(requestDTO.ID)
 	logFields["filter"] = filter
 
 	entity, err = s.guestRepository.FindOne(ctx, filter, nil, false)
@@ -1054,7 +1027,7 @@ func (s *GuestService) UpdateByID(ctx context.Context, requestDTO *dtos.UpdateGu
 	logFields["responseDTO"] = responseDTO
 
 	s.tryDeleteEntityCaches(ctx, logFields, "UpdateByID")
-	s.publishSingleEvent(ctx, logFields, s.cfg.Guest.Event.Updated.Enable, s.cfg.Guest.Event.Updated.Topic, entity, "UpdateByID")
+	s.publishEvent(ctx, logFields, s.cfg.Guest.Event.Updated.Enable, s.cfg.Guest.Event.Updated.Topic, "UpdateByID", *entity)
 
 	return responseDTO, nil
 }
@@ -1098,11 +1071,11 @@ func (s *GuestService) ProcessEvent(ctx context.Context, requestDTO *dtos.GuestE
 
 func (s *GuestService) BulkCreate(ctx context.Context, requestDTO *dtos.BulkCreateGuestsRequestDTO) (*dtos.BulkCreateGuestsResponseDTO, error) {
 	var (
-		span          trace.Span
-		logFields     map[string]interface{}
-		newEntities   []entities.GuestEntity
-		responseDTO   *dtos.BulkCreateGuestsResponseDTO
-		err           error
+		span        trace.Span
+		logFields   map[string]interface{}
+		newEntities []entities.GuestEntity
+		responseDTO *dtos.BulkCreateGuestsResponseDTO
+		err         error
 	)
 
 	ctx, span = tracer.Start(ctx, "[GuestService][BulkCreate]")
@@ -1140,7 +1113,7 @@ func (s *GuestService) BulkCreate(ctx context.Context, requestDTO *dtos.BulkCrea
 	logFields["responseDTO"] = responseDTO
 
 	s.tryDeleteEntityCaches(ctx, logFields, "BulkCreate")
-	s.publishBulkEvent(ctx, logFields, s.cfg.Guest.Event.BulkCreated.Enable, s.cfg.Guest.Event.BulkCreated.Topic, newEntities, "BulkCreate")
+	s.publishEvent(ctx, logFields, s.cfg.Guest.Event.BulkCreated.Enable, s.cfg.Guest.Event.BulkCreated.Topic, "BulkCreate", newEntities...)
 
 	return responseDTO, nil
 }
@@ -1184,7 +1157,7 @@ func (s *GuestService) BulkUpdate(ctx context.Context, requestDTO *dtos.BulkUpda
 
 	entityIDs = requestDTO.ToIDs()
 
-	filter = s.buildActiveEntityFilterByIDs(entityIDs)
+	filter = s.buildActiveEntityFilterByIDs(entityIDs...)
 	logFields["filter"] = filter
 
 	existingEntities, err = s.guestRepository.FindAll(ctx, filter, nil, uint64(len(requestDTO.Items)), 0, false)
@@ -1232,7 +1205,7 @@ func (s *GuestService) BulkUpdate(ctx context.Context, requestDTO *dtos.BulkUpda
 	logFields["responseDTO"] = responseDTO
 
 	s.tryDeleteEntityCaches(ctx, logFields, "BulkUpdate")
-	s.publishBulkEvent(ctx, logFields, s.cfg.Guest.Event.BulkUpdated.Enable, s.cfg.Guest.Event.BulkUpdated.Topic, updatedEntities, "BulkUpdate")
+	s.publishEvent(ctx, logFields, s.cfg.Guest.Event.BulkUpdated.Enable, s.cfg.Guest.Event.BulkUpdated.Topic, "BulkUpdate", updatedEntities...)
 
 	return responseDTO, nil
 }
@@ -1271,7 +1244,7 @@ func (s *GuestService) BulkDelete(ctx context.Context, requestDTO *dtos.BulkDele
 
 	entityIDs = requestDTO.ToIDs()
 
-	filter = s.buildActiveEntityFilterByIDs(entityIDs)
+	filter = s.buildActiveEntityFilterByIDs(entityIDs...)
 	logFields["filter"] = filter
 
 	existingEntities, err = s.guestRepository.FindAll(ctx, filter, nil, uint64(len(requestDTO.IDs)), 0, false)
@@ -1301,7 +1274,7 @@ func (s *GuestService) BulkDelete(ctx context.Context, requestDTO *dtos.BulkDele
 	}
 
 	s.tryDeleteEntityCaches(ctx, logFields, "BulkDelete")
-	s.publishBulkEvent(ctx, logFields, s.cfg.Guest.Event.BulkDeleted.Enable, s.cfg.Guest.Event.BulkDeleted.Topic, deletedEntities, "BulkDelete")
+	s.publishEvent(ctx, logFields, s.cfg.Guest.Event.BulkDeleted.Enable, s.cfg.Guest.Event.BulkDeleted.Topic, "BulkDelete", deletedEntities...)
 
 	return nil
 }

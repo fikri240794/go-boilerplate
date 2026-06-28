@@ -763,6 +763,6 @@ The sample `Guest` feature is meant to be replaced with your own domain entity. 
 5. **Update config** — Adjust `configs/` with your own cache keys, event topics, etc.
 6. **Remove old files** — Delete `Guest`-specific files from each layer, then verify the build and tests pass.
 
-> 💡 The boilerplate patterns are designed so that swapping an entity is mostly a **rename-and-replace** exercise — the generic repository, service helpers (`withTransaction`, `tryDeleteEntityCaches`, `publishSingleEvent`, etc.), and transport patterns stay the same.
+> 💡 The boilerplate patterns are designed so that swapping an entity is mostly a **rename-and-replace** exercise — the generic repository, service helpers (`withTransaction`, `tryDeleteEntityCaches`, `publishEvent`, etc.), and transport patterns stay the same.
 
 Happy Coding! 🚀

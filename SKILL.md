@@ -18,13 +18,13 @@ The existing `Guest` entity is a sample. When you need to replace it with your o
 | 3 | Add database field name constants matching your entity's `db` tags | `internal/models/entities/your_entity.go` |
 | 4 | Create/update repository interfaces (`IYourRepository`) | `internal/repositories/your_repository.go` |
 | 5 | Create concrete repository struct (embeds `BoilerplateDatabaseRepository[T]`) | `internal/repositories/your_repository.go` |
-| 6 | Create service interface and struct using all helpers (`withTransaction`, `tryDeleteEntityCaches`, `publishSingleEvent`, etc.) | `internal/services/your_service.go` |
+| 6 | Create service interface and struct using all helpers (`withTransaction`, `tryDeleteEntityCaches`, `publishEvent`, etc.) | `internal/services/your_service.go` |
 | 7 | Create transport handlers (HTTP, gRPC, event consumer) + VMs | `transports/{http,grpc,event_consumer}/` |
 | 8 | Update Wire providers (`provider.go`) in all layers | `internal/repositories/`, `internal/services/`, `transports/*/handlers/` |
 | 9 | Update config with your entity's cache keys, event topics, etc. | `configs/config.go` + `.env` |
 | 10 | Delete old `Guest`-specific files and regenerate mocks | Run `make generate && make test` |
 
-> All the generic helpers (`getEntityMeta`, `prepareQueryStatement`, `logSlowQuery`, `withTransaction`, `buildActiveEntityFilterByID`, `tryDeleteEntityCaches`, `publishSingleEvent`, etc.) are **entity-agnostic** — they work with any `TEntity` without modification. This means most of the heavy lifting is already done for you.
+> All the generic helpers (`getEntityMeta`, `prepareQueryStatement`, `logSlowQuery`, `withTransaction`, `buildActiveEntityFilterByIDs`, `tryDeleteEntityCaches`, `publishEvent`, etc.) are **entity-agnostic** — they work with any `TEntity` without modification. This means most of the heavy lifting is already done for you.
 
 ---
 
@@ -1017,7 +1017,7 @@ func (s *GuestService) Xxx(ctx context.Context, requestDTO *dtos.XxxRequestDTO) 
     s.tryDeleteEntityCaches(ctx, logFields, "Xxx")
 
     // ── 10. Event publishing (mutations only, if enabled) ──
-    s.publishSingleEvent(ctx, logFields, s.cfg.Guest.Event.Xxx.Enable, s.cfg.Guest.Event.Xxx.Topic, entity, "Xxx")
+    s.publishEvent(ctx, logFields, s.cfg.Guest.Event.Xxx.Enable, s.cfg.Guest.Event.Xxx.Topic, "Xxx", *entity)
 
     return responseDTO, nil
 }
@@ -1028,8 +1028,7 @@ func (s *GuestService) Xxx(ctx context.Context, requestDTO *dtos.XxxRequestDTO) 
 | Helper | Signature | Used In |
 |---|---|---|
 | `withTransaction` | `(ctx, logFields, fnName, fn func(tx) error) error` | Create, DeleteByID, UpdateByID, BulkCreate, BulkUpdate, BulkDelete |
-| `buildActiveEntityFilterByID` | `(id string) *goqube.Filter` | DeleteByID, UpdateByID, FindByID |
-| `buildActiveEntityFilterByIDs` | `(ids []string) *goqube.Filter` | BulkUpdate, BulkDelete |
+| `buildActiveEntityFilterByIDs` | `(ids ...string) *goqube.Filter` | Single ID (OperatorEqual) or multiple IDs (OperatorIn) |
 | `findEntityByID` | `(ctx, cacheKey, filter) (*GuestEntity, error)` | FindByID |
 | `findListEntity` | `(ctx, cacheKey, filter, sorts, take, skip) ([]GuestEntity, error)` | FindAll |
 | `countEntities` | `(ctx, cacheKey, filter) (uint64, error)` | FindAll |
@@ -1041,8 +1040,7 @@ func (s *GuestService) Xxx(ctx context.Context, requestDTO *dtos.XxxRequestDTO) 
 | `setEntitiesCountCache` | `(ctx, cacheKey, count) error` | countEntities |
 | `deleteEntityCaches` | `(ctx) error` | tryDeleteEntityCaches |
 | `tryDeleteEntityCaches` | `(ctx, logFields, fnName)` | All 6 mutation functions |
-| `publishSingleEvent` | `(ctx, logFields, enable, topic, entity, fnName)` | Create, DeleteByID, UpdateByID |
-| `publishBulkEvent` | `(ctx, logFields, enable, topic, entities, fnName)` | BulkCreate, BulkUpdate, BulkDelete |
+| `publishEvent` | `(ctx, logFields, enable, topic, fnName, entities ...GuestEntity)` | Single via `*entity`, Bulk via `entities...` |
 
 ### 11.5 Cache-Aside Pattern
 
@@ -1578,7 +1576,7 @@ func NewXxxResponseVM(responseDTO *dtos.XxxResponseDTO) *protobuf_boilerplate.Xx
 
 ```
 Service (publish event)
-    → EventProducerRepository.Publish/PublishBulk
+    → EventProducerRepository.Publish (single entity) / PublishBulk (multiple entities)
         → Marshal to JSON (EventEntity[T])
         → InjectTracerPropagator (carry trace context)
         → NSQProducer.Publish(topic, body)
@@ -2060,9 +2058,9 @@ mock.ExpectExec("DELETE FROM (.+)").WillReturnError(errors.New("exec error"))
 | Do | Don't |
 |---|---|
 | Declare all vars in `var (...)` at function start | Use `:=` except in `for i := range` |
-| Use `s.withTransaction`, `s.tryDeleteEntityCaches`, `s.publishSingleEvent` | Duplicate transaction/cache/event boilerplate |
+| Use `s.withTransaction`, `s.tryDeleteEntityCaches`, `s.publishEvent` | Duplicate transaction/cache/event boilerplate |
 | Use `r.prepareQueryStatement`, `r.logSlowQuery` | Duplicate prepare/timing code in Count/FindAll/FindOne |
-| Use `s.buildActiveEntityFilterByID` / `ByIDs` | Manually build `{id=? AND deleted_at IS NULL}` filter |
+| Use `s.buildActiveEntityFilterByIDs` | Manually build `{id=? AND deleted_at IS NULL}` filter |
 | Start tracer span in every public method | Forget `defer span.End()` |
 | Call `message.InjectTracerPropagator(ctx)` in ALL publish methods | Skip tracer propagation in bulk methods |
 | Swallow cache/event errors (`err = nil` after log) | Return cache/event errors to caller |

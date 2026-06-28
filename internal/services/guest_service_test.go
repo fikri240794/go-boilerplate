@@ -4893,6 +4893,7 @@ func Test_GuestService_BulkCreate(t *testing.T) {
 			requestDTO: &dtos.BulkCreateGuestsRequestDTO{
 				Items: []dtos.CreateGuestRequestDTO{
 					{Name: "John", CreatedBy: "admin"},
+					{Name: "Jane", CreatedBy: "admin"},
 				},
 			},
 			expectError: false,
@@ -4939,6 +4940,7 @@ func Test_GuestService_BulkCreate(t *testing.T) {
 			requestDTO: &dtos.BulkCreateGuestsRequestDTO{
 				Items: []dtos.CreateGuestRequestDTO{
 					{Name: "John", CreatedBy: "admin"},
+					{Name: "Jane", CreatedBy: "admin"},
 				},
 			},
 			expectError: false,
@@ -5368,8 +5370,9 @@ func Test_GuestService_BulkUpdate(t *testing.T) {
 				mockTx.On("Commit").Return(nil)
 
 				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
-				mockGuestRepo.On("FindAll", mock.Anything, mock.AnythingOfType("*goqube.Filter"), mock.Anything, uint64(1), uint64(0), false).Return([]entities.GuestEntity{
+				mockGuestRepo.On("FindAll", mock.Anything, mock.AnythingOfType("*goqube.Filter"), mock.Anything, uint64(2), uint64(0), false).Return([]entities.GuestEntity{
 					{ID: uuid.FromStringOrNil("01932293-d710-7f55-a9f6-66e6248ae72f"), Name: "Old", CreatedAt: time.Now().UnixMilli(), CreatedBy: "admin"},
+					{ID: uuid.FromStringOrNil("01932293-d710-7f55-a9f6-66e6248ae73f"), Name: "Old2", CreatedAt: time.Now().UnixMilli(), CreatedBy: "admin"},
 				}, nil)
 				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
 				mockGuestRepo.On("WithTransaction", mockTx).Return(mockGuestRepo)
@@ -5392,6 +5395,7 @@ func Test_GuestService_BulkUpdate(t *testing.T) {
 			requestDTO: &dtos.BulkUpdateGuestsRequestDTO{
 				Items: []dtos.UpdateGuestByIDRequestDTO{
 					{ID: "01932293-d710-7f55-a9f6-66e6248ae72f", Name: "Updated Name", UpdatedBy: "admin"},
+					{ID: "01932293-d710-7f55-a9f6-66e6248ae73f", Name: "Updated Name 2", UpdatedBy: "admin"},
 				},
 			},
 			expectError: false,
@@ -5428,7 +5432,7 @@ func Test_GuestService_BulkUpdate(t *testing.T) {
 				mockCache.On("Keys", mock.Anything, "guest:*").Return([]string{}, nil)
 
 				mockEventProducer := repo_mocks.NewGuestEventProducerRepositoryMock(t)
-				mockEventProducer.On("PublishBulk", mock.Anything, "guest.bulk.updated", mock.Anything).Return(errors.New("event publish error"))
+				mockEventProducer.On("Publish", mock.Anything, "guest.bulk.updated", mock.Anything).Return(errors.New("event publish error"))
 
 				return NewGuestService(
 					cfg,
@@ -5870,7 +5874,7 @@ func Test_GuestService_BulkDelete(t *testing.T) {
 				mockCache.On("Keys", mock.Anything, "guest:*").Return([]string{}, nil)
 
 				mockEventProducer := repo_mocks.NewGuestEventProducerRepositoryMock(t)
-				mockEventProducer.On("PublishBulk", mock.Anything, "guest.bulk.deleted", mock.Anything).Return(nil)
+				mockEventProducer.On("Publish", mock.Anything, "guest.bulk.deleted", mock.Anything).Return(nil)
 
 				return NewGuestService(
 					cfg,
@@ -5915,7 +5919,7 @@ func Test_GuestService_BulkDelete(t *testing.T) {
 				mockCache.On("Keys", mock.Anything, "guest:*").Return([]string{}, nil)
 
 				mockEventProducer := repo_mocks.NewGuestEventProducerRepositoryMock(t)
-				mockEventProducer.On("PublishBulk", mock.Anything, "guest.bulk.deleted", mock.Anything).Return(errors.New("event publish error"))
+				mockEventProducer.On("Publish", mock.Anything, "guest.bulk.deleted", mock.Anything).Return(errors.New("event publish error"))
 
 				return NewGuestService(
 					cfg,
