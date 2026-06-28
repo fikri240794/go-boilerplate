@@ -79,6 +79,12 @@ type testEntityForExec struct {
 	Name string `db:"name"`
 }
 
+type testEntityForBulkExec struct {
+	tableName string `table:"bulk_test_table"`
+	ID        int    `db:"id" primary_key:"true" db_type:"int"`
+	Name      string `db:"name" db_type:"text"`
+}
+
 func Test_newBoilerplateDatabaseStatement(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -485,7 +491,7 @@ func Test_boilerplateDatabaseTransaction_Commit(t *testing.T) {
 			expectError: true,
 			validate: func(t *testing.T, err error) {
 				assert.NotNil(t, err, "expected error, got nil")
-				assert.Equal(t, "commit error", err.Error(), fmt.Sprintf("expected 'commit error', got %v", err.Error()))
+				assert.Equal(t, "error", err.Error(), fmt.Sprintf("expected 'error', got %v", err.Error()))
 			},
 		},
 	}
@@ -679,7 +685,7 @@ func Test_boilerplateDatabaseTransaction_Rollback(t *testing.T) {
 			expectError: true,
 			validate: func(t *testing.T, err error) {
 				assert.NotNil(t, err, "expected error, got nil")
-				assert.Equal(t, "rollback error", err.Error(), fmt.Sprintf("expected 'rollback error', got %v", err.Error()))
+				assert.Equal(t, "error", err.Error(), fmt.Sprintf("expected 'error', got %v", err.Error()))
 			},
 		},
 	}
@@ -810,11 +816,11 @@ func Test_BoilerplateDatabaseRepository_getTableNameAndFields(t *testing.T) {
 				return repo.getTableNameAndFields()
 			},
 			expectedTable:  "test_table",
-			expectedFields: []string{"id", "name", "email", "created_at"},
+			expectedFields: []string{"name", "email", "created_at"},
 			validate: func(t *testing.T, tableName string, fields []string) {
 				assert.Equal(t, "test_table", tableName, fmt.Sprintf("expected table name 'test_table', got '%s'", tableName))
-				assert.Len(t, fields, 4, fmt.Sprintf("expected 4 fields, got %d", len(fields)))
-				expectedFields := []string{"id", "name", "email", "created_at"}
+				assert.Len(t, fields, 3, fmt.Sprintf("expected 3 fields (ID has table tag, should be skipped), got %d", len(fields)))
+				expectedFields := []string{"name", "email", "created_at"}
 				assert.Equal(t, expectedFields, fields, fmt.Sprintf("expected fields %v, got %v", expectedFields, fields))
 			},
 		},
@@ -835,10 +841,10 @@ func Test_BoilerplateDatabaseRepository_getTableNameAndFields(t *testing.T) {
 				return repo.getTableNameAndFields()
 			},
 			expectedTable:  "users",
-			expectedFields: []string{"id", "name"},
+			expectedFields: []string{"name"},
 			validate: func(t *testing.T, tableName string, fields []string) {
 				assert.Equal(t, "users", tableName, fmt.Sprintf("expected table name 'users', got '%s'", tableName))
-				assert.Len(t, fields, 2, fmt.Sprintf("expected 2 fields (dash tags should be ignored), got %d", len(fields)))
+				assert.Len(t, fields, 1, fmt.Sprintf("expected 1 field (ID has table tag, dash tags should be ignored), got %d", len(fields)))
 			},
 		},
 		{
@@ -858,10 +864,10 @@ func Test_BoilerplateDatabaseRepository_getTableNameAndFields(t *testing.T) {
 				return repo.getTableNameAndFields()
 			},
 			expectedTable:  "products",
-			expectedFields: []string{"id", "name"},
+			expectedFields: []string{"name"},
 			validate: func(t *testing.T, tableName string, fields []string) {
 				assert.Equal(t, "products", tableName, fmt.Sprintf("expected table name 'products', got '%s'", tableName))
-				assert.Len(t, fields, 2, fmt.Sprintf("expected 2 fields (empty tags should be ignored), got %d", len(fields)))
+				assert.Len(t, fields, 1, fmt.Sprintf("expected 1 field (ID has table tag, empty tags should be ignored), got %d", len(fields)))
 			},
 		},
 		{
@@ -881,10 +887,10 @@ func Test_BoilerplateDatabaseRepository_getTableNameAndFields(t *testing.T) {
 				return repo.getTableNameAndFields()
 			},
 			expectedTable:  "orders",
-			expectedFields: []string{"id", "code"},
+			expectedFields: []string{"code"},
 			validate: func(t *testing.T, tableName string, fields []string) {
 				assert.Equal(t, "orders", tableName, fmt.Sprintf("expected table name 'orders', got '%s'", tableName))
-				assert.Len(t, fields, 2, fmt.Sprintf("expected 2 fields, got %d", len(fields)))
+				assert.Len(t, fields, 1, fmt.Sprintf("expected 1 field (ID has table tag, should be skipped), got %d", len(fields)))
 			},
 		},
 	}
@@ -900,12 +906,12 @@ func Test_BoilerplateDatabaseRepository_getTableNameAndFields(t *testing.T) {
 	}
 }
 
-func Test_BoilerplateDatabaseRepository_getTableNameAndMapFieldWithValueFrom(t *testing.T) {
+func Test_BoilerplateDatabaseRepository_getEntityMeta(t *testing.T) {
 	now := time.Now()
 
 	tests := []struct {
 		name                 string
-		setupRepo            func() (string, map[string]interface{})
+		setupRepo            func() entityMeta
 		expectedTable        string
 		expectedMapLen       int
 		expectedMapContains  map[string]interface{}
@@ -914,7 +920,7 @@ func Test_BoilerplateDatabaseRepository_getTableNameAndMapFieldWithValueFrom(t *
 	}{
 		{
 			name: "get table name and map field with value from entity with valid tags and values",
-			setupRepo: func() (string, map[string]interface{}) {
+			setupRepo: func() entityMeta {
 				mockMasterDB, _, _ := sqlmock.New()
 				mockSlaveDB, _, _ := sqlmock.New()
 
@@ -933,7 +939,7 @@ func Test_BoilerplateDatabaseRepository_getTableNameAndMapFieldWithValueFrom(t *
 					Age:       30,
 					CreatedAt: now,
 				}
-				return repo.getTableNameAndMapFieldWithValueFrom(entity)
+				return repo.getEntityMeta(entity)
 			},
 			expectedTable:  "test_values_table",
 			expectedMapLen: 4,
@@ -955,7 +961,7 @@ func Test_BoilerplateDatabaseRepository_getTableNameAndMapFieldWithValueFrom(t *
 		},
 		{
 			name: "get table name and map with dash tag (should be ignored)",
-			setupRepo: func() (string, map[string]interface{}) {
+			setupRepo: func() entityMeta {
 				mockMasterDB, _, _ := sqlmock.New()
 				mockSlaveDB, _, _ := sqlmock.New()
 
@@ -973,7 +979,7 @@ func Test_BoilerplateDatabaseRepository_getTableNameAndMapFieldWithValueFrom(t *
 					Password: "secret123",
 					Internal: "internal_data",
 				}
-				return repo.getTableNameAndMapFieldWithValueFrom(entity)
+				return repo.getEntityMeta(entity)
 			},
 			expectedTable:        "users_values",
 			expectedMapLen:       1,
@@ -989,7 +995,7 @@ func Test_BoilerplateDatabaseRepository_getTableNameAndMapFieldWithValueFrom(t *
 		},
 		{
 			name: "get table name and map with empty tags (should be ignored)",
-			setupRepo: func() (string, map[string]interface{}) {
+			setupRepo: func() entityMeta {
 				mockMasterDB, _, _ := sqlmock.New()
 				mockSlaveDB, _, _ := sqlmock.New()
 
@@ -1008,7 +1014,7 @@ func Test_BoilerplateDatabaseRepository_getTableNameAndMapFieldWithValueFrom(t *
 					Ignored1: "should_be_ignored",
 					Ignored2: "also_ignored",
 				}
-				return repo.getTableNameAndMapFieldWithValueFrom(entity)
+				return repo.getEntityMeta(entity)
 			},
 			expectedTable:        "products_values",
 			expectedMapLen:       2,
@@ -1025,7 +1031,7 @@ func Test_BoilerplateDatabaseRepository_getTableNameAndMapFieldWithValueFrom(t *
 		},
 		{
 			name: "get table name and map with zero values",
-			setupRepo: func() (string, map[string]interface{}) {
+			setupRepo: func() entityMeta {
 				mockMasterDB, _, _ := sqlmock.New()
 				mockSlaveDB, _, _ := sqlmock.New()
 
@@ -1041,7 +1047,7 @@ func Test_BoilerplateDatabaseRepository_getTableNameAndMapFieldWithValueFrom(t *
 					ID:   0,
 					Name: "",
 				}
-				return repo.getTableNameAndMapFieldWithValueFrom(entity)
+				return repo.getEntityMeta(entity)
 			},
 			expectedTable:  "nullable_table",
 			expectedMapLen: 1,
@@ -1056,10 +1062,9 @@ func Test_BoilerplateDatabaseRepository_getTableNameAndMapFieldWithValueFrom(t *
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tableName, mapFieldWithValue := tt.setupRepo()
-
+			meta := tt.setupRepo()
 			if tt.validate != nil {
-				tt.validate(t, tableName, mapFieldWithValue)
+				tt.validate(t, meta.TableName, meta.FieldValueMap)
 			}
 		})
 	}
@@ -1121,7 +1126,7 @@ func Test_BoilerplateDatabaseRepository_exec(t *testing.T) {
 			expectError: true,
 			validate: func(t *testing.T, err error) {
 				assert.NotNil(t, err, "expected error, got nil")
-				assert.Equal(t, "prepare error", err.Error(), fmt.Sprintf("expected error to contain 'prepare error', got %v", err.Error()))
+				assert.Equal(t, "error", err.Error(), fmt.Sprintf("expected error to contain 'error', got %v", err.Error()))
 			},
 		},
 		{
@@ -1146,7 +1151,7 @@ func Test_BoilerplateDatabaseRepository_exec(t *testing.T) {
 			expectError: true,
 			validate: func(t *testing.T, err error) {
 				assert.NotNil(t, err, "expected error, got nil")
-				assert.Equal(t, "exec error", err.Error(), fmt.Sprintf("expected error to contain 'exec error', got %v", err.Error()))
+				assert.Equal(t, "error", err.Error(), fmt.Sprintf("expected error to contain 'error', got %v", err.Error()))
 			},
 		},
 		{
@@ -1205,7 +1210,7 @@ func Test_BoilerplateDatabaseRepository_exec(t *testing.T) {
 			expectError: true,
 			validate: func(t *testing.T, err error) {
 				assert.NotNil(t, err, "expected error, got nil")
-				assert.Equal(t, "tx prepare error", err.Error(), fmt.Sprintf("expected error to contain 'tx prepare error', got %v", err.Error()))
+				assert.Equal(t, "error", err.Error(), fmt.Sprintf("expected error to contain 'error', got %v", err.Error()))
 			},
 		},
 		{
@@ -1369,7 +1374,7 @@ func Test_BoilerplateDatabaseRepository_BeginTransaction(t *testing.T) {
 			validate: func(t *testing.T, tx IBoilerplateDatabaseTransaction, err error) {
 				assert.NotNil(t, err, "expected error, got nil")
 				assert.Nil(t, tx, fmt.Sprintf("expected transaction to be nil on error, got %v", tx))
-				assert.Equal(t, "begin transaction error", err.Error(), fmt.Sprintf("expected error message 'begin transaction error', got %v", err.Error()))
+				assert.Equal(t, "error", err.Error(), fmt.Sprintf("expected error message 'error', got %v", err.Error()))
 			},
 		},
 		{
@@ -2958,6 +2963,218 @@ func Test_BoilerplateDatabaseRepository_Update(t *testing.T) {
 			}
 
 			assert.NoError(t, mockMaster.ExpectationsWereMet(), fmt.Sprintf("Unfulfilled master expectations: %v", mockMaster.ExpectationsWereMet()))
+		})
+	}
+}
+func Test_BoilerplateDatabaseRepository_BulkCreate(t *testing.T) {
+	tests := []struct {
+		name        string
+		setupRepo   func() (*BoilerplateDatabaseRepository[testEntityForBulkExec], sqlmock.Sqlmock)
+		ctx         context.Context
+		entities    []testEntityForBulkExec
+		expectError bool
+		validate    func(t *testing.T, err error)
+	}{
+		{
+			name: "bulk create successfully with multiple entities",
+			setupRepo: func() (*BoilerplateDatabaseRepository[testEntityForBulkExec], sqlmock.Sqlmock) {
+				mockDB, mock, _ := sqlmock.New()
+				boilerplateDB := &boilerplate_database.BoilerplateDatabase{Master: sqlx.NewDb(mockDB, "mysql"), MasterMaxQueryDurationWarning: 100 * time.Millisecond}
+				repo := NewBoilerplateDatabaseRepository[testEntityForBulkExec](boilerplateDB)
+				return repo, mock
+			},
+			ctx:         context.Background(),
+			entities:    []testEntityForBulkExec{{ID: 1, Name: "Entity 1"}, {ID: 2, Name: "Entity 2"}},
+			expectError: false,
+			validate:    func(t *testing.T, err error) { assert.NoError(t, err) },
+		},
+		{
+			name: "bulk create with empty entities",
+			setupRepo: func() (*BoilerplateDatabaseRepository[testEntityForBulkExec], sqlmock.Sqlmock) {
+				mockDB, mock, _ := sqlmock.New()
+				boilerplateDB := &boilerplate_database.BoilerplateDatabase{Master: sqlx.NewDb(mockDB, "mysql"), MasterMaxQueryDurationWarning: 100 * time.Millisecond}
+				repo := NewBoilerplateDatabaseRepository[testEntityForBulkExec](boilerplateDB)
+				return repo, mock
+			},
+			ctx:         context.Background(),
+			entities:    []testEntityForBulkExec{},
+			expectError: false,
+			validate:    func(t *testing.T, err error) { assert.NoError(t, err) },
+		},
+		{
+			name: "bulk create with BuildInsertQuery error",
+			setupRepo: func() (*BoilerplateDatabaseRepository[testEntityForBulkExec], sqlmock.Sqlmock) {
+				mockDB, mock, _ := sqlmock.New()
+				boilerplateDB := &boilerplate_database.BoilerplateDatabase{Master: sqlx.NewDb(mockDB, "invalid_dialect"), MasterMaxQueryDurationWarning: 100 * time.Millisecond}
+				repo := NewBoilerplateDatabaseRepository[testEntityForBulkExec](boilerplateDB)
+				return repo, mock
+			},
+			ctx:         context.Background(),
+			entities:    []testEntityForBulkExec{{ID: 1, Name: "Entity 1"}},
+			expectError: true,
+			validate:    func(t *testing.T, err error) { assert.NotNil(t, err) },
+		},
+		{
+			name: "bulk create with exec error",
+			setupRepo: func() (*BoilerplateDatabaseRepository[testEntityForBulkExec], sqlmock.Sqlmock) {
+				mockDB, mock, _ := sqlmock.New()
+				boilerplateDB := &boilerplate_database.BoilerplateDatabase{Master: sqlx.NewDb(mockDB, "mysql"), MasterMaxQueryDurationWarning: 100 * time.Millisecond}
+				repo := NewBoilerplateDatabaseRepository[testEntityForBulkExec](boilerplateDB)
+				return repo, mock
+			},
+			ctx:         context.Background(),
+			entities:    []testEntityForBulkExec{{ID: 1, Name: "Entity 1"}},
+			expectError: true,
+			validate:    func(t *testing.T, err error) { assert.NotNil(t, err) },
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo, mock := tt.setupRepo()
+			switch tt.name {
+			case "bulk create successfully with multiple entities":
+				mock.ExpectPrepare("INSERT INTO (.+)").WillBeClosed()
+				mock.ExpectExec("INSERT INTO (.+)").WillReturnResult(sqlmock.NewResult(1, 2))
+			case "bulk create with exec error":
+				mock.ExpectPrepare("INSERT INTO (.+)").WillBeClosed()
+				mock.ExpectExec("INSERT INTO (.+)").WillReturnError(errors.New("exec error"))
+			}
+			err := repo.BulkCreate(tt.ctx, tt.entities)
+			if tt.expectError {
+				assert.NotNil(t, err)
+			}
+			if !tt.expectError {
+				assert.NoError(t, err)
+			}
+			if tt.validate != nil {
+				tt.validate(t, err)
+			}
+			if len(tt.entities) > 0 && tt.name != "bulk create with BuildInsertQuery error" && tt.name != "bulk create with exec error" {
+				assert.NoError(t, mock.ExpectationsWereMet())
+			}
+		})
+	}
+}
+func Test_BoilerplateDatabaseRepository_BulkUpdate(t *testing.T) {
+	tests := []struct {
+		name        string
+		setupRepo   func() (*BoilerplateDatabaseRepository[testEntityForBulkExec], sqlmock.Sqlmock)
+		ctx         context.Context
+		entities    []testEntityForBulkExec
+		expectError bool
+		validate    func(t *testing.T, err error)
+	}{
+		{
+			name: "bulk update successfully with multiple entities",
+			setupRepo: func() (*BoilerplateDatabaseRepository[testEntityForBulkExec], sqlmock.Sqlmock) {
+				mockDB, mock, _ := sqlmock.New()
+				boilerplateDB := &boilerplate_database.BoilerplateDatabase{Master: sqlx.NewDb(mockDB, "mysql"), MasterMaxQueryDurationWarning: 100 * time.Millisecond}
+				repo := NewBoilerplateDatabaseRepository[testEntityForBulkExec](boilerplateDB)
+				return repo, mock
+			},
+			ctx:         context.Background(),
+			entities:    []testEntityForBulkExec{{ID: 1, Name: "Updated 1"}, {ID: 2, Name: "Updated 2"}},
+			expectError: false,
+			validate:    func(t *testing.T, err error) { assert.NoError(t, err) },
+		},
+		{
+			name: "bulk update with empty entities",
+			setupRepo: func() (*BoilerplateDatabaseRepository[testEntityForBulkExec], sqlmock.Sqlmock) {
+				mockDB, mock, _ := sqlmock.New()
+				boilerplateDB := &boilerplate_database.BoilerplateDatabase{Master: sqlx.NewDb(mockDB, "mysql"), MasterMaxQueryDurationWarning: 100 * time.Millisecond}
+				repo := NewBoilerplateDatabaseRepository[testEntityForBulkExec](boilerplateDB)
+				return repo, mock
+			},
+			ctx:         context.Background(),
+			entities:    []testEntityForBulkExec{},
+			expectError: false,
+			validate:    func(t *testing.T, err error) { assert.NoError(t, err) },
+		},
+		{
+			name: "bulk update with BuildBulkUpdateQuery error",
+			setupRepo: func() (*BoilerplateDatabaseRepository[testEntityForBulkExec], sqlmock.Sqlmock) {
+				mockDB, mock, _ := sqlmock.New()
+				boilerplateDB := &boilerplate_database.BoilerplateDatabase{Master: sqlx.NewDb(mockDB, "invalid_dialect"), MasterMaxQueryDurationWarning: 100 * time.Millisecond}
+				repo := NewBoilerplateDatabaseRepository[testEntityForBulkExec](boilerplateDB)
+				return repo, mock
+			},
+			ctx:         context.Background(),
+			entities:    []testEntityForBulkExec{{ID: 1, Name: "Test"}},
+			expectError: true,
+			validate:    func(t *testing.T, err error) { assert.NotNil(t, err) },
+		},
+		{
+			name: "bulk update with exec error",
+			setupRepo: func() (*BoilerplateDatabaseRepository[testEntityForBulkExec], sqlmock.Sqlmock) {
+				mockDB, mock, _ := sqlmock.New()
+				boilerplateDB := &boilerplate_database.BoilerplateDatabase{Master: sqlx.NewDb(mockDB, "mysql"), MasterMaxQueryDurationWarning: 100 * time.Millisecond}
+				repo := NewBoilerplateDatabaseRepository[testEntityForBulkExec](boilerplateDB)
+				return repo, mock
+			},
+			ctx:         context.Background(),
+			entities:    []testEntityForBulkExec{{ID: 1, Name: "Test"}},
+			expectError: true,
+			validate:    func(t *testing.T, err error) { assert.NotNil(t, err) },
+		},
+		{
+			name: "bulk update with postgres dialect",
+			setupRepo: func() (*BoilerplateDatabaseRepository[testEntityForBulkExec], sqlmock.Sqlmock) {
+				mockDB, mock, _ := sqlmock.New()
+				boilerplateDB := &boilerplate_database.BoilerplateDatabase{Master: sqlx.NewDb(mockDB, "postgres"), MasterMaxQueryDurationWarning: 100 * time.Millisecond}
+				repo := NewBoilerplateDatabaseRepository[testEntityForBulkExec](boilerplateDB)
+				return repo, mock
+			},
+			ctx:         context.Background(),
+			entities:    []testEntityForBulkExec{{ID: 1, Name: "Entity 1"}, {ID: 2, Name: "Entity 2"}},
+			expectError: false,
+			validate:    func(t *testing.T, err error) { assert.NoError(t, err) },
+		},
+		{
+			name: "bulk update with sqlserver dialect",
+			setupRepo: func() (*BoilerplateDatabaseRepository[testEntityForBulkExec], sqlmock.Sqlmock) {
+				mockDB, mock, _ := sqlmock.New()
+				boilerplateDB := &boilerplate_database.BoilerplateDatabase{Master: sqlx.NewDb(mockDB, "sqlserver"), MasterMaxQueryDurationWarning: 100 * time.Millisecond}
+				repo := NewBoilerplateDatabaseRepository[testEntityForBulkExec](boilerplateDB)
+				return repo, mock
+			},
+			ctx:         context.Background(),
+			entities:    []testEntityForBulkExec{{ID: 1, Name: "Entity 1"}, {ID: 2, Name: "Entity 2"}},
+			expectError: false,
+			validate:    func(t *testing.T, err error) { assert.NoError(t, err) },
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo, mock := tt.setupRepo()
+			switch tt.name {
+			case "bulk update successfully with multiple entities":
+				mock.ExpectPrepare("UPDATE (.+)").WillBeClosed()
+				mock.ExpectExec("UPDATE (.+)").WillReturnResult(sqlmock.NewResult(0, 2))
+			case "bulk update with exec error":
+				mock.ExpectPrepare("UPDATE (.+)").WillBeClosed()
+				mock.ExpectExec("UPDATE (.+)").WillReturnError(errors.New("exec error"))
+			case "bulk update with postgres dialect":
+				mock.ExpectPrepare("UPDATE (.+)").WillBeClosed()
+				mock.ExpectExec("UPDATE (.+)").WillReturnResult(sqlmock.NewResult(0, 2))
+			case "bulk update with sqlserver dialect":
+				mock.ExpectPrepare("UPDATE (.+)").WillBeClosed()
+				mock.ExpectExec("UPDATE (.+)").WillReturnResult(sqlmock.NewResult(0, 2))
+			}
+			err := repo.BulkUpdate(tt.ctx, tt.entities)
+			if tt.expectError {
+				assert.NotNil(t, err)
+			}
+			if !tt.expectError {
+				assert.NoError(t, err)
+			}
+			if tt.validate != nil {
+				tt.validate(t, err)
+			}
+			if len(tt.entities) > 0 && tt.name != "bulk update with BuildBulkUpdateQuery error" && tt.name != "bulk update with exec error" {
+				assert.NoError(t, mock.ExpectationsWereMet())
+			}
 		})
 	}
 }

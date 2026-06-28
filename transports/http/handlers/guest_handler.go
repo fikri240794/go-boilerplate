@@ -29,6 +29,9 @@ func NewGuestHandler(guestService services.IGuestService) *GuestHandler {
 func (h *GuestHandler) SetupRoutes(server *fiber.App) {
 	server.Route("/guests", func(api fiber.Router) {
 		api.Post("/", h.Create)
+		api.Post("/bulk", h.BulkCreate)
+		api.Put("/bulk", h.BulkUpdate)
+		api.Delete("/bulk", h.BulkDelete)
 		api.Delete("/:id", h.DeleteByID)
 		api.Get("/", h.FindAll)
 		api.Get("/:id", h.FindByID)
@@ -141,19 +144,7 @@ func (h *GuestHandler) DeleteByID(c *fiber.Ctx) error {
 	logFields = map[string]interface{}{}
 
 	requestVM = &vms.DeleteGuestByIDRequestVM{}
-	err = c.ParamsParser(requestVM)
-	if err != nil {
-		log.Warn().
-			Ctx(ctx).
-			Err(err).
-			Fields(logFields).
-			Msg("[GuestHandler][DeleteByID][ParamsParser] failed to parse request params")
-		err = gocerr.New(fiber.StatusBadRequest, err.Error())
-		responseVM = gores.NewResponseVM[bool]().
-			SetErrorFromError(err)
-		return c.Status(responseVM.Code).
-			JSON(responseVM)
-	}
+	c.ParamsParser(requestVM)
 	logFields["requestVM"] = requestVM
 
 	requestDTO = requestVM.ToDTO(uuid.Nil.String())
@@ -293,19 +284,7 @@ func (h *GuestHandler) FindByID(c *fiber.Ctx) error {
 	logFields = map[string]interface{}{}
 
 	requestVM = &vms.FindGuestByIDRequestVM{}
-	err = c.ParamsParser(requestVM)
-	if err != nil {
-		log.Warn().
-			Ctx(ctx).
-			Err(err).
-			Fields(logFields).
-			Msg("[GuestHandler][FindByID][ParamsParser] failed to parse request params")
-		err = gocerr.New(fiber.StatusBadRequest, err.Error())
-		responseVM = gores.NewResponseVM[*vms.GuestResponseVM]().
-			SetErrorFromError(err)
-		return c.Status(responseVM.Code).
-			JSON(responseVM)
-	}
+	c.ParamsParser(requestVM)
 	logFields["requestVM"] = requestVM
 
 	requestDTO = requestVM.ToDTO()
@@ -369,19 +348,7 @@ func (h *GuestHandler) UpdateByID(c *fiber.Ctx) error {
 	logFields = map[string]interface{}{}
 
 	requestVM = &vms.UpdateGuestByIDRequestVM{}
-	err = c.ParamsParser(requestVM)
-	if err != nil {
-		log.Warn().
-			Ctx(ctx).
-			Err(err).
-			Fields(logFields).
-			Msg("[GuestHandler][UpdateByID][ParamsParser] failed to parse request params")
-		err = gocerr.New(fiber.StatusBadRequest, err.Error())
-		responseVM = gores.NewResponseVM[*vms.GuestResponseVM]().
-			SetErrorFromError(err)
-		return c.Status(responseVM.Code).
-			JSON(responseVM)
-	}
+	c.ParamsParser(requestVM)
 	logFields["requestVM"] = requestVM
 
 	err = c.BodyParser(requestVM)
@@ -423,6 +390,230 @@ func (h *GuestHandler) UpdateByID(c *fiber.Ctx) error {
 	responseVM = gores.NewResponseVM[*vms.GuestResponseVM]().
 		SetCode(fiber.StatusOK).
 		SetData(vms.NewGuestResponseVM(responseDTO))
+
+	return c.Status(responseVM.Code).
+		JSON(responseVM)
+}
+
+// @Summary	Bulk Create Guests
+// @Description	Bulk Create Guests
+// @Tags	guest
+// @Accept	application/json
+// @Produce	application/json
+// @Param	BulkCreateGuestsRequestVM	body	vms.BulkCreateGuestsRequestVM	true	"BulkCreateGuestsRequestVM"
+// @Success	201	{object}	gores.ResponseVM[[]vms.GuestResponseVM]
+// @Failure	400	{object}	gores.ResponseVM[[]vms.GuestResponseVM]
+// @Failure	500	{object}	gores.ResponseVM[[]vms.GuestResponseVM]
+// @Router	/guests/bulk [post]
+func (h *GuestHandler) BulkCreate(c *fiber.Ctx) error {
+	var (
+		ctx         context.Context
+		span        trace.Span
+		logFields   map[string]interface{}
+		requestVM   *vms.BulkCreateGuestsRequestVM
+		requestDTO  *dtos.BulkCreateGuestsRequestDTO
+		responseDTO *dtos.BulkCreateGuestsResponseDTO
+		logLevel    zerolog.Level
+		responseVM  *gores.ResponseVM[*[]vms.GuestResponseVM]
+		err         error
+	)
+
+	ctx = c.UserContext()
+
+	ctx, span = tracer.Start(ctx, "[GuestHandler][BulkCreate]")
+	defer span.End()
+
+	logFields = map[string]interface{}{}
+
+	requestVM = &vms.BulkCreateGuestsRequestVM{}
+	err = c.BodyParser(requestVM)
+	if err != nil {
+		log.Warn().
+			Ctx(ctx).
+			Err(err).
+			Fields(logFields).
+			Msg("[GuestHandler][BulkCreate][BodyParser] failed to parse request body")
+		err = gocerr.New(fiber.StatusBadRequest, err.Error())
+		responseVM = gores.NewResponseVM[*[]vms.GuestResponseVM]().
+			SetErrorFromError(err)
+		return c.Status(responseVM.Code).
+			JSON(responseVM)
+	}
+	logFields["requestVM"] = requestVM
+
+	requestDTO = requestVM.ToDTO(uuid.Nil.String())
+	logFields["requestDTO"] = requestDTO
+
+	responseDTO, err = h.guestService.BulkCreate(ctx, requestDTO)
+	if err != nil {
+		logLevel = zerolog.WarnLevel
+		if gocerr.GetErrorCode(err) >= fiber.StatusInternalServerError {
+			logLevel = zerolog.ErrorLevel
+		}
+
+		log.WithLevel(logLevel).
+			Ctx(ctx).
+			Err(err).
+			Fields(logFields).
+			Msg("[GuestHandler][BulkCreate][BulkCreate] failed to bulk create")
+		responseVM = gores.NewResponseVM[*[]vms.GuestResponseVM]().
+			SetErrorFromError(err)
+		return c.Status(responseVM.Code).
+			JSON(responseVM)
+	}
+
+	responseVM = gores.NewResponseVM[*[]vms.GuestResponseVM]().
+		SetCode(fiber.StatusCreated).
+		SetData(vms.NewBulkCreateGuestsResponseVM(responseDTO))
+
+	return c.Status(responseVM.Code).
+		JSON(responseVM)
+}
+
+// @Summary	Bulk Update Guests
+// @Description	Bulk Update Guests
+// @Tags	guest
+// @Accept	application/json
+// @Produce	application/json
+// @Param	BulkUpdateGuestsRequestVM	body	vms.BulkUpdateGuestsRequestVM	true	"BulkUpdateGuestsRequestVM"
+// @Success	200	{object}	gores.ResponseVM[[]vms.GuestResponseVM]
+// @Failure	400	{object}	gores.ResponseVM[[]vms.GuestResponseVM]
+// @Failure	500	{object}	gores.ResponseVM[[]vms.GuestResponseVM]
+// @Router	/guests/bulk [put]
+func (h *GuestHandler) BulkUpdate(c *fiber.Ctx) error {
+	var (
+		ctx         context.Context
+		span        trace.Span
+		logFields   map[string]interface{}
+		requestVM   *vms.BulkUpdateGuestsRequestVM
+		requestDTO  *dtos.BulkUpdateGuestsRequestDTO
+		responseDTO *dtos.BulkUpdateGuestsResponseDTO
+		logLevel    zerolog.Level
+		responseVM  *gores.ResponseVM[*[]vms.GuestResponseVM]
+		err         error
+	)
+
+	ctx = c.UserContext()
+
+	ctx, span = tracer.Start(ctx, "[GuestHandler][BulkUpdate]")
+	defer span.End()
+
+	logFields = map[string]interface{}{}
+
+	requestVM = &vms.BulkUpdateGuestsRequestVM{}
+	err = c.BodyParser(requestVM)
+	if err != nil {
+		log.Warn().
+			Ctx(ctx).
+			Err(err).
+			Fields(logFields).
+			Msg("[GuestHandler][BulkUpdate][BodyParser] failed to parse request body")
+		err = gocerr.New(fiber.StatusBadRequest, err.Error())
+		responseVM = gores.NewResponseVM[*[]vms.GuestResponseVM]().
+			SetErrorFromError(err)
+		return c.Status(responseVM.Code).
+			JSON(responseVM)
+	}
+	logFields["requestVM"] = requestVM
+
+	requestDTO = requestVM.ToDTO(uuid.Nil.String())
+	logFields["requestDTO"] = requestDTO
+
+	responseDTO, err = h.guestService.BulkUpdate(ctx, requestDTO)
+	if err != nil {
+		logLevel = zerolog.WarnLevel
+		if gocerr.GetErrorCode(err) >= fiber.StatusInternalServerError {
+			logLevel = zerolog.ErrorLevel
+		}
+
+		log.WithLevel(logLevel).
+			Ctx(ctx).
+			Err(err).
+			Fields(logFields).
+			Msg("[GuestHandler][BulkUpdate][BulkUpdate] failed to bulk update")
+		responseVM = gores.NewResponseVM[*[]vms.GuestResponseVM]().
+			SetErrorFromError(err)
+		return c.Status(responseVM.Code).
+			JSON(responseVM)
+	}
+
+	responseVM = gores.NewResponseVM[*[]vms.GuestResponseVM]().
+		SetCode(fiber.StatusOK).
+		SetData(vms.NewBulkUpdateGuestsResponseVM(responseDTO))
+
+	return c.Status(responseVM.Code).
+		JSON(responseVM)
+}
+
+// @Summary	Bulk Delete Guests
+// @Description	Bulk Delete Guests
+// @Tags	guest
+// @Accept	application/json
+// @Produce	application/json
+// @Param	BulkDeleteGuestsRequestVM	body	vms.BulkDeleteGuestsRequestVM	true	"BulkDeleteGuestsRequestVM"
+// @Success	200	{object}	gores.ResponseVM[bool]
+// @Failure	400	{object}	gores.ResponseVM[bool]
+// @Failure	500	{object}	gores.ResponseVM[bool]
+// @Router	/guests/bulk [delete]
+func (h *GuestHandler) BulkDelete(c *fiber.Ctx) error {
+	var (
+		ctx        context.Context
+		span       trace.Span
+		logFields  map[string]interface{}
+		requestVM  *vms.BulkDeleteGuestsRequestVM
+		requestDTO *dtos.BulkDeleteGuestsRequestDTO
+		logLevel   zerolog.Level
+		responseVM *gores.ResponseVM[bool]
+		err        error
+	)
+
+	ctx = c.UserContext()
+
+	ctx, span = tracer.Start(ctx, "[GuestHandler][BulkDelete]")
+	defer span.End()
+
+	logFields = map[string]interface{}{}
+
+	requestVM = &vms.BulkDeleteGuestsRequestVM{}
+	err = c.BodyParser(requestVM)
+	if err != nil {
+		log.Warn().
+			Ctx(ctx).
+			Err(err).
+			Fields(logFields).
+			Msg("[GuestHandler][BulkDelete][BodyParser] failed to parse request body")
+		err = gocerr.New(fiber.StatusBadRequest, err.Error())
+		responseVM = gores.NewResponseVM[bool]().
+			SetErrorFromError(err)
+		return c.Status(responseVM.Code).
+			JSON(responseVM)
+	}
+	logFields["requestVM"] = requestVM
+
+	requestDTO = requestVM.ToDTO(uuid.Nil.String())
+	logFields["requestDTO"] = requestDTO
+
+	err = h.guestService.BulkDelete(ctx, requestDTO)
+	if err != nil {
+		logLevel = zerolog.WarnLevel
+		if gocerr.GetErrorCode(err) >= fiber.StatusInternalServerError {
+			logLevel = zerolog.ErrorLevel
+		}
+
+		log.WithLevel(logLevel).
+			Ctx(ctx).
+			Err(err).
+			Fields(logFields).
+			Msg("[GuestHandler][BulkDelete][BulkDelete] failed to bulk delete")
+		responseVM = gores.NewResponseVM[bool]().
+			SetErrorFromError(err)
+		return c.Status(responseVM.Code).
+			JSON(responseVM)
+	}
+
+	responseVM = gores.NewResponseVM[bool]().
+		SetCode(fiber.StatusOK).
+		SetData(true)
 
 	return c.Status(responseVM.Code).
 		JSON(responseVM)

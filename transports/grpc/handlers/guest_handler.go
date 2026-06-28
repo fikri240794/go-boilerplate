@@ -242,3 +242,138 @@ func (h *ImplementedBoilerplateServer) UpdateGuestByID(ctx context.Context, requ
 	responseVM = vms.NewGuestResponseVM(responseDTO)
 	return responseVM, nil
 }
+
+func (h *ImplementedBoilerplateServer) BulkCreateGuests(ctx context.Context, requestVM *protobuf_boilerplate.BulkCreateGuestsRequestVM) (*protobuf_boilerplate.BulkCreateGuestsResponseVM, error) {
+	var (
+		span        trace.Span
+		logFields   map[string]interface{}
+		requestDTO  *dtos.BulkCreateGuestsRequestDTO
+		responseDTO *dtos.BulkCreateGuestsResponseDTO
+		logLevel    zerolog.Level
+		responseVM  *protobuf_boilerplate.BulkCreateGuestsResponseVM
+		err         error
+	)
+
+	ctx, span = tracer.Start(ctx, "[ImplementedBoilerplateServer][BulkCreateGuests]")
+	defer span.End()
+
+	if requestVM == nil {
+		err = grpc_error.FromError(gocerr.New(http.StatusBadRequest, "requestVM is nil"))
+		return nil, err
+	}
+
+	logFields = map[string]interface{}{
+		"requestVM": requestVM,
+	}
+
+	requestDTO = vms.BulkCreateGuestsRequestVMToDTO(requestVM, uuid.Nil.String())
+	logFields["requestDTO"] = requestDTO
+
+	responseDTO, err = h.guestService.BulkCreate(ctx, requestDTO)
+	if err != nil {
+		logLevel = zerolog.WarnLevel
+		if gocerr.GetErrorCode(err) >= http.StatusInternalServerError {
+			logLevel = zerolog.ErrorLevel
+		}
+
+		err = grpc_error.FromError(err)
+		log.WithLevel(logLevel).
+			Ctx(ctx).
+			Err(err).
+			Fields(logFields).
+			Msg("[ImplementedBoilerplateServer][BulkCreateGuests][BulkCreate] failed to bulk create")
+		return nil, err
+	}
+
+	responseVM = vms.NewBulkCreateGuestsResponseVM(responseDTO)
+	return responseVM, nil
+}
+
+func (h *ImplementedBoilerplateServer) BulkUpdateGuests(ctx context.Context, requestVM *protobuf_boilerplate.BulkUpdateGuestsRequestVM) (*protobuf_boilerplate.BulkUpdateGuestsResponseVM, error) {
+	var (
+		span        trace.Span
+		logFields   map[string]interface{}
+		requestDTO  *dtos.BulkUpdateGuestsRequestDTO
+		responseDTO *dtos.BulkUpdateGuestsResponseDTO
+		logLevel    zerolog.Level
+		responseVM  *protobuf_boilerplate.BulkUpdateGuestsResponseVM
+		err         error
+	)
+
+	ctx, span = tracer.Start(ctx, "[ImplementedBoilerplateServer][BulkUpdateGuests]")
+	defer span.End()
+
+	if requestVM == nil {
+		err = grpc_error.FromError(gocerr.New(http.StatusBadRequest, "requestVM is nil"))
+		return nil, err
+	}
+
+	logFields = map[string]interface{}{
+		"requestVM": requestVM,
+	}
+
+	requestDTO = vms.BulkUpdateGuestsRequestVMToDTO(requestVM, uuid.Nil.String())
+	logFields["requestDTO"] = requestDTO
+
+	responseDTO, err = h.guestService.BulkUpdate(ctx, requestDTO)
+	if err != nil {
+		logLevel = zerolog.WarnLevel
+		if gocerr.GetErrorCode(err) >= http.StatusInternalServerError {
+			logLevel = zerolog.ErrorLevel
+		}
+
+		err = grpc_error.FromError(err)
+		log.WithLevel(logLevel).
+			Ctx(ctx).
+			Err(err).
+			Fields(logFields).
+			Msg("[ImplementedBoilerplateServer][BulkUpdateGuests][BulkUpdate] failed to bulk update")
+		return nil, err
+	}
+
+	responseVM = vms.NewBulkUpdateGuestsResponseVM(responseDTO)
+	return responseVM, nil
+}
+
+func (h *ImplementedBoilerplateServer) BulkDeleteGuests(ctx context.Context, requestVM *protobuf_boilerplate.BulkDeleteGuestsRequestVM) (*emptypb.Empty, error) {
+	var (
+		span       trace.Span
+		logFields  map[string]interface{}
+		requestDTO *dtos.BulkDeleteGuestsRequestDTO
+		logLevel   zerolog.Level
+		err        error
+	)
+
+	ctx, span = tracer.Start(ctx, "[ImplementedBoilerplateServer][BulkDeleteGuests]")
+	defer span.End()
+
+	if requestVM == nil {
+		err = grpc_error.FromError(gocerr.New(http.StatusBadRequest, "requestVM is nil"))
+		return nil, err
+	}
+
+	logFields = map[string]interface{}{
+		"requestVM": requestVM,
+	}
+
+	requestDTO = vms.BulkDeleteGuestsRequestVMToDTO(requestVM, uuid.Nil.String())
+	logFields["requestDTO"] = requestDTO
+
+	err = h.guestService.BulkDelete(ctx, requestDTO)
+	if err != nil {
+		logLevel = zerolog.WarnLevel
+		if gocerr.GetErrorCode(err) >= http.StatusInternalServerError {
+			logLevel = zerolog.ErrorLevel
+		}
+
+		err = grpc_error.FromError(err)
+		log.WithLevel(logLevel).
+			Ctx(ctx).
+			Err(err).
+			Fields(logFields).
+			Msg("[ImplementedBoilerplateServer][BulkDeleteGuests][BulkDelete] failed to bulk delete")
+		return nil, err
+	}
+
+	return &emptypb.Empty{}, nil
+}

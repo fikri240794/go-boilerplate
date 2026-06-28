@@ -1,0 +1,18 @@
+title Bulk Create Guest
+actor user
+user -> app: bulk create guest (multiple data)
+database postgre
+app -> postgre: multi-row insert guest
+app <- postgre: guests inserted
+database redis
+app -> redis: delete caches
+app <- redis: caches deleted
+app -> NSQ: publish created guests
+app <- NSQ: created guests published
+user <- app: bulk created response
+group background async process
+NSQ -> app: send created guests data
+app -> webhook.site: send created guests data via http request
+app <- webhook.site: http response
+NSQ <- app: process response
+end

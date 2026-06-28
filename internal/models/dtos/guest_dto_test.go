@@ -888,3 +888,428 @@ func TestUpdateGuestByIDRequestDTO_ToExistingEntity(t *testing.T) {
 		})
 	}
 }
+
+func TestBulkCreateGuestsRequestDTO_Validate(t *testing.T) {
+	tests := []struct {
+		name        string
+		dto         *BulkCreateGuestsRequestDTO
+		expectError bool
+		validate    func(t *testing.T, err error)
+	}{
+		{
+			name: "valid bulk create guests request with single item",
+			dto: &BulkCreateGuestsRequestDTO{
+				Items: []CreateGuestRequestDTO{
+					{Name: "John Doe", Address: "123 Main St", CreatedBy: "admin"},
+				},
+			},
+			expectError: false,
+			validate: func(t *testing.T, err error) {
+				assert.NoError(t, err)
+			},
+		},
+		{
+			name: "valid bulk create guests request with multiple items",
+			dto: &BulkCreateGuestsRequestDTO{
+				Items: []CreateGuestRequestDTO{
+					{Name: "John Doe", Address: "123 Main St", CreatedBy: "admin"},
+					{Name: "Jane Smith", CreatedBy: "system"},
+				},
+			},
+			expectError: false,
+			validate: func(t *testing.T, err error) {
+				assert.NoError(t, err)
+			},
+		},
+		{
+			name: "invalid bulk create guests request with empty items",
+			dto: &BulkCreateGuestsRequestDTO{
+				Items: []CreateGuestRequestDTO{},
+			},
+			expectError: true,
+			validate: func(t *testing.T, err error) {
+				assert.Error(t, err)
+			},
+		},
+		{
+			name:        "invalid bulk create guests request with nil items",
+			dto:         &BulkCreateGuestsRequestDTO{},
+			expectError: true,
+			validate: func(t *testing.T, err error) {
+				assert.Error(t, err)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.dto.Validate()
+
+			tt.validate(t, err)
+		})
+	}
+}
+
+func TestBulkCreateGuestsRequestDTO_ToEntities(t *testing.T) {
+	tests := []struct {
+		name     string
+		dto      *BulkCreateGuestsRequestDTO
+		validate func(t *testing.T, result []entities.GuestEntity)
+	}{
+		{
+			name: "convert single item to entities",
+			dto: &BulkCreateGuestsRequestDTO{
+				Items: []CreateGuestRequestDTO{
+					{Name: "John Doe", Address: "123 Main St", CreatedBy: "admin"},
+				},
+			},
+			validate: func(t *testing.T, result []entities.GuestEntity) {
+				assert.Len(t, result, 1)
+				assert.Equal(t, "John Doe", result[0].Name)
+				assert.Equal(t, "admin", result[0].CreatedBy)
+			},
+		},
+		{
+			name: "convert multiple items to entities",
+			dto: &BulkCreateGuestsRequestDTO{
+				Items: []CreateGuestRequestDTO{
+					{Name: "John Doe", CreatedBy: "admin"},
+					{Name: "Jane Smith", CreatedBy: "system"},
+				},
+			},
+			validate: func(t *testing.T, result []entities.GuestEntity) {
+				assert.Len(t, result, 2)
+				assert.Equal(t, "John Doe", result[0].Name)
+				assert.Equal(t, "Jane Smith", result[1].Name)
+			},
+		},
+		{
+			name: "convert empty items to empty slice",
+			dto: &BulkCreateGuestsRequestDTO{
+				Items: []CreateGuestRequestDTO{},
+			},
+			validate: func(t *testing.T, result []entities.GuestEntity) {
+				assert.Len(t, result, 0)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.dto.ToEntities()
+
+			tt.validate(t, result)
+		})
+	}
+}
+
+func TestNewBulkCreateGuestsResponseDTO(t *testing.T) {
+	now := time.Now().UnixMilli()
+
+	tests := []struct {
+		name     string
+		entities []entities.GuestEntity
+		validate func(t *testing.T, result *BulkCreateGuestsResponseDTO)
+	}{
+		{
+			name: "create response with multiple entities",
+			entities: []entities.GuestEntity{
+				{ID: uuid.Must(uuid.NewV7()), Name: "John Doe", CreatedAt: now, CreatedBy: "admin"},
+				{ID: uuid.Must(uuid.NewV7()), Name: "Jane Smith", CreatedAt: now, CreatedBy: "system"},
+			},
+			validate: func(t *testing.T, result *BulkCreateGuestsResponseDTO) {
+				assert.NotNil(t, result)
+				assert.Len(t, result.Guests, 2)
+				assert.Equal(t, "John Doe", result.Guests[0].Name)
+				assert.Equal(t, "Jane Smith", result.Guests[1].Name)
+			},
+		},
+		{
+			name:     "create response with empty entities",
+			entities: []entities.GuestEntity{},
+			validate: func(t *testing.T, result *BulkCreateGuestsResponseDTO) {
+				assert.NotNil(t, result)
+				assert.Len(t, result.Guests, 0)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := NewBulkCreateGuestsResponseDTO(tt.entities)
+
+			tt.validate(t, result)
+		})
+	}
+}
+
+func TestBulkUpdateGuestsRequestDTO_Validate(t *testing.T) {
+	validUUID := uuid.Must(uuid.NewV4()).String()
+
+	tests := []struct {
+		name        string
+		dto         *BulkUpdateGuestsRequestDTO
+		expectError bool
+		validate    func(t *testing.T, err error)
+	}{
+		{
+			name: "valid bulk update guests request with single item",
+			dto: &BulkUpdateGuestsRequestDTO{
+				Items: []UpdateGuestByIDRequestDTO{
+					{ID: validUUID, Name: "Updated Name", Address: "123 Main St", UpdatedBy: "admin"},
+				},
+			},
+			expectError: false,
+			validate: func(t *testing.T, err error) {
+				assert.NoError(t, err)
+			},
+		},
+		{
+			name: "valid bulk update guests request with multiple items",
+			dto: &BulkUpdateGuestsRequestDTO{
+				Items: []UpdateGuestByIDRequestDTO{
+					{ID: validUUID, Name: "Name 1", UpdatedBy: "admin"},
+					{ID: validUUID, Name: "Name 2", UpdatedBy: "system"},
+				},
+			},
+			expectError: false,
+			validate: func(t *testing.T, err error) {
+				assert.NoError(t, err)
+			},
+		},
+		{
+			name: "invalid bulk update guests request with empty items",
+			dto: &BulkUpdateGuestsRequestDTO{
+				Items: []UpdateGuestByIDRequestDTO{},
+			},
+			expectError: true,
+			validate: func(t *testing.T, err error) {
+				assert.Error(t, err)
+			},
+		},
+		{
+			name:        "invalid bulk update guests request with nil items",
+			dto:         &BulkUpdateGuestsRequestDTO{},
+			expectError: true,
+			validate: func(t *testing.T, err error) {
+				assert.Error(t, err)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.dto.Validate()
+
+			tt.validate(t, err)
+		})
+	}
+}
+
+func TestNewBulkUpdateGuestsResponseDTO(t *testing.T) {
+	now := time.Now().UnixMilli()
+
+	tests := []struct {
+		name     string
+		entities []entities.GuestEntity
+		validate func(t *testing.T, result *BulkUpdateGuestsResponseDTO)
+	}{
+		{
+			name: "create response with multiple entities",
+			entities: []entities.GuestEntity{
+				{ID: uuid.Must(uuid.NewV7()), Name: "John Doe", CreatedAt: now, CreatedBy: "admin"},
+				{ID: uuid.Must(uuid.NewV7()), Name: "Jane Smith", CreatedAt: now, CreatedBy: "system"},
+			},
+			validate: func(t *testing.T, result *BulkUpdateGuestsResponseDTO) {
+				assert.NotNil(t, result)
+				assert.Len(t, result.Guests, 2)
+				assert.Equal(t, "John Doe", result.Guests[0].Name)
+				assert.Equal(t, "Jane Smith", result.Guests[1].Name)
+			},
+		},
+		{
+			name:     "create response with empty entities",
+			entities: []entities.GuestEntity{},
+			validate: func(t *testing.T, result *BulkUpdateGuestsResponseDTO) {
+				assert.NotNil(t, result)
+				assert.Len(t, result.Guests, 0)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := NewBulkUpdateGuestsResponseDTO(tt.entities)
+
+			tt.validate(t, result)
+		})
+	}
+}
+
+func TestBulkDeleteGuestsRequestDTO_Validate(t *testing.T) {
+	validUUID := uuid.Must(uuid.NewV4()).String()
+
+	tests := []struct {
+		name        string
+		dto         *BulkDeleteGuestsRequestDTO
+		expectError bool
+		validate    func(t *testing.T, err error)
+	}{
+		{
+			name: "valid bulk delete guests request with single id",
+			dto: &BulkDeleteGuestsRequestDTO{
+				IDs:       []string{validUUID},
+				DeletedBy: "admin",
+			},
+			expectError: false,
+			validate: func(t *testing.T, err error) {
+				assert.NoError(t, err)
+			},
+		},
+		{
+			name: "valid bulk delete guests request with multiple ids",
+			dto: &BulkDeleteGuestsRequestDTO{
+				IDs:       []string{validUUID, validUUID},
+				DeletedBy: "admin",
+			},
+			expectError: false,
+			validate: func(t *testing.T, err error) {
+				assert.NoError(t, err)
+			},
+		},
+		{
+			name: "invalid bulk delete guests request with empty ids",
+			dto: &BulkDeleteGuestsRequestDTO{
+				IDs:       []string{},
+				DeletedBy: "admin",
+			},
+			expectError: true,
+			validate: func(t *testing.T, err error) {
+				assert.Error(t, err)
+			},
+		},
+		{
+			name: "invalid bulk delete guests request with nil ids",
+			dto: &BulkDeleteGuestsRequestDTO{
+				DeletedBy: "admin",
+			},
+			expectError: true,
+			validate: func(t *testing.T, err error) {
+				assert.Error(t, err)
+			},
+		},
+		{
+			name: "invalid bulk delete guests request with invalid uuid",
+			dto: &BulkDeleteGuestsRequestDTO{
+				IDs:       []string{"invalid-uuid"},
+				DeletedBy: "admin",
+			},
+			expectError: true,
+			validate: func(t *testing.T, err error) {
+				assert.Error(t, err)
+			},
+		},
+		{
+			name: "invalid bulk delete guests request missing deleted_by",
+			dto: &BulkDeleteGuestsRequestDTO{
+				IDs: []string{validUUID},
+			},
+			expectError: true,
+			validate: func(t *testing.T, err error) {
+				assert.Error(t, err)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.dto.Validate()
+
+			tt.validate(t, err)
+		})
+	}
+}
+
+func TestBulkUpdateGuestsRequestDTO_ToIDs(t *testing.T) {
+	validUUID := uuid.Must(uuid.NewV4()).String()
+
+	tests := []struct {
+		name     string
+		dto      *BulkUpdateGuestsRequestDTO
+		expected []string
+	}{
+		{
+			name: "to ids with single item",
+			dto: &BulkUpdateGuestsRequestDTO{
+				Items: []UpdateGuestByIDRequestDTO{
+					{ID: validUUID, Name: "Name 1", UpdatedBy: "admin"},
+				},
+			},
+			expected: []string{validUUID},
+		},
+		{
+			name: "to ids with multiple items",
+			dto: &BulkUpdateGuestsRequestDTO{
+				Items: []UpdateGuestByIDRequestDTO{
+					{ID: "id-1", Name: "Name 1", UpdatedBy: "admin"},
+					{ID: "id-2", Name: "Name 2", UpdatedBy: "system"},
+					{ID: "id-3", Name: "Name 3", UpdatedBy: "user"},
+				},
+			},
+			expected: []string{"id-1", "id-2", "id-3"},
+		},
+		{
+			name: "to ids with empty items",
+			dto: &BulkUpdateGuestsRequestDTO{
+				Items: []UpdateGuestByIDRequestDTO{},
+			},
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.dto.ToIDs()
+
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestBulkDeleteGuestsRequestDTO_ToIDs(t *testing.T) {
+	tests := []struct {
+		name     string
+		dto      *BulkDeleteGuestsRequestDTO
+		expected []string
+	}{
+		{
+			name: "to ids with multiple ids",
+			dto: &BulkDeleteGuestsRequestDTO{
+				IDs: []string{"id-1", "id-2", "id-3"},
+			},
+			expected: []string{"id-1", "id-2", "id-3"},
+		},
+		{
+			name: "to ids with single id",
+			dto: &BulkDeleteGuestsRequestDTO{
+				IDs: []string{"single-id"},
+			},
+			expected: []string{"single-id"},
+		},
+		{
+			name: "to ids with empty ids",
+			dto: &BulkDeleteGuestsRequestDTO{
+				IDs: []string{},
+			},
+			expected: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.dto.ToIDs()
+
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}

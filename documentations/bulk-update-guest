@@ -1,0 +1,18 @@
+title Bulk Update Guest
+actor user
+user -> app: bulk update guest (multiple data)
+database postgre
+app -> postgre: bulk update guests (multi-row via values join)
+app <- postgre: guests updated
+database redis
+app -> redis: delete caches
+app <- redis: caches deleted
+app -> NSQ: publish updated guests
+app <- NSQ: updated guests published
+user <- app: bulk updated response
+group background async process
+NSQ -> app: send updated guests data
+app -> webhook.site: send updated guests data via http request
+app <- webhook.site: http response
+NSQ <- app: process response
+end

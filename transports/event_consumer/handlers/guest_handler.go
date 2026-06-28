@@ -68,10 +68,10 @@ func (h *GuestHandler) HandleCreated(ctx context.Context, m *nsq.Message) error 
 	}
 
 	requestDTO = requestVM.Message.ToDTO()
+	logFields["requestDTO"] = requestDTO
 
 	_, err = h.guestService.ProcessEvent(ctx, requestDTO)
 	if err != nil {
-		logFields["requestDTO"] = requestDTO
 		log.Err(err).
 			Ctx(ctx).
 			Fields(logFields).
@@ -125,10 +125,10 @@ func (h *GuestHandler) HandleDeleted(ctx context.Context, m *nsq.Message) error 
 	}
 
 	requestDTO = requestVM.Message.ToDTO()
+	logFields["requestDTO"] = requestDTO
 
 	_, err = h.guestService.ProcessEvent(ctx, requestDTO)
 	if err != nil {
-		logFields["requestDTO"] = requestDTO
 		log.Err(err).
 			Ctx(ctx).
 			Fields(logFields).
@@ -141,11 +141,15 @@ func (h *GuestHandler) HandleDeleted(ctx context.Context, m *nsq.Message) error 
 
 func (h *GuestHandler) HandleUpdated(ctx context.Context, m *nsq.Message) error {
 	var (
+		span       trace.Span
 		logFields  map[string]interface{}
 		requestVM  *vms.EventRequestVM[vms.GuestEventRequestVM]
 		requestDTO *dtos.GuestEventRequestDTO
 		err        error
 	)
+
+	ctx, span = tracer.Start(ctx, "[GuestHandler][HandleUpdated]")
+	defer span.End()
 
 	logFields = map[string]interface{}{
 		"messageBody": string(m.Body),
@@ -178,15 +182,198 @@ func (h *GuestHandler) HandleUpdated(ctx context.Context, m *nsq.Message) error 
 	}
 
 	requestDTO = requestVM.Message.ToDTO()
+	logFields["requestDTO"] = requestDTO
 
 	_, err = h.guestService.ProcessEvent(ctx, requestDTO)
 	if err != nil {
-		logFields["requestDTO"] = requestDTO
 		log.Err(err).
 			Ctx(ctx).
 			Fields(logFields).
 			Msg("[GuestHandler][HandleUpdated][ProcessEvent] failed to process event")
 		return err
+	}
+
+	return nil
+}
+
+func (h *GuestHandler) HandleBulkCreated(ctx context.Context, m *nsq.Message) error {
+	var (
+		span       trace.Span
+		logFields  map[string]interface{}
+		requestVM  *vms.EventRequestVM[[]vms.GuestEventRequestVM]
+		requestDTO *dtos.GuestEventRequestDTO
+		err        error
+	)
+
+	ctx, span = tracer.Start(ctx, "[GuestHandler][HandleBulkCreated]")
+	defer span.End()
+
+	logFields = map[string]interface{}{
+		"messageBody": string(m.Body),
+	}
+
+	log.Info().
+		Ctx(ctx).
+		Fields(logFields).
+		Msg("[GuestHandler][HandleBulkCreated] message received")
+
+	requestVM = &vms.EventRequestVM[[]vms.GuestEventRequestVM]{}
+	err = json.Unmarshal(m.Body, requestVM)
+	if err != nil {
+		log.Err(err).
+			Ctx(ctx).
+			Fields(logFields).
+			Msg("[GuestHandler][HandleBulkCreated][Unmarshal] failed to parse message body")
+		err = gocerr.New(http.StatusInternalServerError, err.Error())
+		return err
+	}
+	logFields["requestVM"] = requestVM
+
+	if requestVM.Message == nil || len(*requestVM.Message) <= 0 {
+		err = gocerr.New(http.StatusInternalServerError, "message is nil")
+		log.Err(err).
+			Ctx(ctx).
+			Fields(logFields).
+			Msg("[GuestHandler][HandleBulkCreated] message is nil")
+		return err
+	}
+
+	for i := range *requestVM.Message {
+		var item = &(*requestVM.Message)[i]
+
+		requestDTO = item.ToDTO()
+		logFields["requestDTO"] = requestDTO
+
+		_, err = h.guestService.ProcessEvent(ctx, requestDTO)
+		if err != nil {
+			log.Err(err).
+				Ctx(ctx).
+				Fields(logFields).
+				Msg("[GuestHandler][HandleBulkCreated][ProcessEvent] failed to process event")
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (h *GuestHandler) HandleBulkUpdated(ctx context.Context, m *nsq.Message) error {
+	var (
+		span       trace.Span
+		logFields  map[string]interface{}
+		requestVM  *vms.EventRequestVM[[]vms.GuestEventRequestVM]
+		requestDTO *dtos.GuestEventRequestDTO
+		err        error
+	)
+
+	ctx, span = tracer.Start(ctx, "[GuestHandler][HandleBulkUpdated]")
+	defer span.End()
+
+	logFields = map[string]interface{}{
+		"messageBody": string(m.Body),
+	}
+
+	log.Info().
+		Ctx(ctx).
+		Fields(logFields).
+		Msg("[GuestHandler][HandleBulkUpdated] message received")
+
+	requestVM = &vms.EventRequestVM[[]vms.GuestEventRequestVM]{}
+	err = json.Unmarshal(m.Body, requestVM)
+	if err != nil {
+		log.Err(err).
+			Ctx(ctx).
+			Fields(logFields).
+			Msg("[GuestHandler][HandleBulkUpdated][Unmarshal] failed to parse message body")
+		err = gocerr.New(http.StatusInternalServerError, err.Error())
+		return err
+	}
+	logFields["requestVM"] = requestVM
+
+	if requestVM.Message == nil || len(*requestVM.Message) <= 0 {
+		err = gocerr.New(http.StatusInternalServerError, "message is nil")
+		log.Err(err).
+			Ctx(ctx).
+			Fields(logFields).
+			Msg("[GuestHandler][HandleBulkUpdated] message is nil")
+		return err
+	}
+
+	for i := range *requestVM.Message {
+		var item = &(*requestVM.Message)[i]
+
+		requestDTO = item.ToDTO()
+		logFields["requestDTO"] = requestDTO
+
+		_, err = h.guestService.ProcessEvent(ctx, requestDTO)
+		if err != nil {
+			log.Err(err).
+				Ctx(ctx).
+				Fields(logFields).
+				Msg("[GuestHandler][HandleBulkUpdated][ProcessEvent] failed to process event")
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (h *GuestHandler) HandleBulkDeleted(ctx context.Context, m *nsq.Message) error {
+	var (
+		span       trace.Span
+		logFields  map[string]interface{}
+		requestVM  *vms.EventRequestVM[[]vms.GuestEventRequestVM]
+		requestDTO *dtos.GuestEventRequestDTO
+		err        error
+	)
+
+	ctx, span = tracer.Start(ctx, "[GuestHandler][HandleBulkDeleted]")
+	defer span.End()
+
+	logFields = map[string]interface{}{
+		"messageBody": string(m.Body),
+	}
+
+	log.Info().
+		Ctx(ctx).
+		Fields(logFields).
+		Msg("[GuestHandler][HandleBulkDeleted] message received")
+
+	requestVM = &vms.EventRequestVM[[]vms.GuestEventRequestVM]{}
+	err = json.Unmarshal(m.Body, requestVM)
+	if err != nil {
+		log.Err(err).
+			Ctx(ctx).
+			Fields(logFields).
+			Msg("[GuestHandler][HandleBulkDeleted][Unmarshal] failed to parse message body")
+		err = gocerr.New(http.StatusInternalServerError, err.Error())
+		return err
+	}
+	logFields["requestVM"] = requestVM
+
+	if requestVM.Message == nil || len(*requestVM.Message) <= 0 {
+		err = gocerr.New(http.StatusInternalServerError, "message is nil")
+		log.Err(err).
+			Ctx(ctx).
+			Fields(logFields).
+			Msg("[GuestHandler][HandleBulkDeleted] message is nil")
+		return err
+	}
+
+	for i := range *requestVM.Message {
+		var item = &(*requestVM.Message)[i]
+
+		requestDTO = item.ToDTO()
+		logFields["requestDTO"] = requestDTO
+
+		_, err = h.guestService.ProcessEvent(ctx, requestDTO)
+		if err != nil {
+			log.Err(err).
+				Ctx(ctx).
+				Fields(logFields).
+				Msg("[GuestHandler][HandleBulkDeleted][ProcessEvent] failed to process event")
+			return err
+		}
 	}
 
 	return nil

@@ -4545,3 +4545,1417 @@ func Test_GuestService_ProcessEvent(t *testing.T) {
 		})
 	}
 }
+
+func Test_GuestService_BulkCreate(t *testing.T) {
+	tests := []struct {
+		name         string
+		setupService func(t *testing.T) *GuestService
+		requestDTO   *dtos.BulkCreateGuestsRequestDTO
+		expectError  bool
+		validate     func(t *testing.T, responseDTO *dtos.BulkCreateGuestsResponseDTO, err error)
+	}{
+		{
+			name: "bulk create successfully without cache and event",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = false
+				cfg.Guest.Cache.Keyf = "guest:%s"
+				cfg.Guest.Event.Created.Enable = false
+
+				mockTx := repo_mocks.NewBoilerplateDatabaseTransactionMock(t)
+				mockTx.On("Commit").Return(nil)
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+				mockGuestRepo.On("WithTransaction", mockTx).Return(mockGuestRepo)
+				mockGuestRepo.On("BulkCreate", mock.Anything, mock.AnythingOfType("[]entities.GuestEntity")).Return(nil)
+
+				mockCache := repo_mocks.NewGuestCacheRepositoryMock(t)
+				mockCache.On("Keys", mock.Anything, "guest:*").Return([]string{}, nil)
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					mockCache,
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkCreateGuestsRequestDTO{
+				Items: []dtos.CreateGuestRequestDTO{
+					{Name: "John Doe", Address: "123 Main St", CreatedBy: "admin"},
+					{Name: "Jane Smith", CreatedBy: "system"},
+				},
+			},
+			expectError: false,
+			validate: func(t *testing.T, responseDTO *dtos.BulkCreateGuestsResponseDTO, err error) {
+				if err != nil {
+					t.Errorf("BulkCreate() unexpected error: %v", err)
+				}
+				if responseDTO == nil {
+					t.Error("BulkCreate() expected responseDTO, got nil")
+				}
+				if len(responseDTO.Guests) != 2 {
+					t.Error("BulkCreate() expected 2 guests, got", len(responseDTO.Guests))
+				}
+			},
+		},
+		{
+			name: "bulk create with nil requestDTO",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				return NewGuestService(
+					cfg,
+					repo_mocks.NewGuestRepositoryMock(t),
+					repo_mocks.NewGuestCacheRepositoryMock(t),
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO:  nil,
+			expectError: true,
+			validate: func(t *testing.T, responseDTO *dtos.BulkCreateGuestsResponseDTO, err error) {
+				if err == nil {
+					t.Error("BulkCreate() expected error for nil requestDTO, got nil")
+				}
+				if responseDTO != nil {
+					t.Error("BulkCreate() expected nil responseDTO on error")
+				}
+			},
+		},
+		{
+			name: "bulk create with validation error",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				return NewGuestService(
+					cfg,
+					repo_mocks.NewGuestRepositoryMock(t),
+					repo_mocks.NewGuestCacheRepositoryMock(t),
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkCreateGuestsRequestDTO{
+				Items: []dtos.CreateGuestRequestDTO{},
+			},
+			expectError: true,
+			validate: func(t *testing.T, responseDTO *dtos.BulkCreateGuestsResponseDTO, err error) {
+				if err == nil {
+					t.Error("BulkCreate() expected validation error, got nil")
+				}
+			},
+		},
+		{
+			name: "bulk create with BeginTransaction error",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = false
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(nil, errors.New("tx error"))
+
+				mockCache := repo_mocks.NewGuestCacheRepositoryMock(t)
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					mockCache,
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkCreateGuestsRequestDTO{
+				Items: []dtos.CreateGuestRequestDTO{
+					{Name: "John", CreatedBy: "admin"},
+				},
+			},
+			expectError: true,
+			validate: func(t *testing.T, responseDTO *dtos.BulkCreateGuestsResponseDTO, err error) {
+				if err == nil {
+					t.Error("BulkCreate() expected BeginTransaction error")
+				}
+			},
+		},
+		{
+			name: "bulk create with BulkCreate error and rollback success",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = false
+
+				mockTx := repo_mocks.NewBoilerplateDatabaseTransactionMock(t)
+				mockTx.On("Rollback").Return(nil)
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+				mockGuestRepo.On("WithTransaction", mockTx).Return(mockGuestRepo)
+				mockGuestRepo.On("BulkCreate", mock.Anything, mock.AnythingOfType("[]entities.GuestEntity")).Return(errors.New("bulk create error"))
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					repo_mocks.NewGuestCacheRepositoryMock(t),
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkCreateGuestsRequestDTO{
+				Items: []dtos.CreateGuestRequestDTO{
+					{Name: "John", CreatedBy: "admin"},
+				},
+			},
+			expectError: true,
+			validate: func(t *testing.T, responseDTO *dtos.BulkCreateGuestsResponseDTO, err error) {
+				if err == nil {
+					t.Error("BulkCreate() expected error")
+				}
+			},
+		},
+		{
+			name: "bulk create with Commit error and rollback success",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = false
+
+				mockTx := repo_mocks.NewBoilerplateDatabaseTransactionMock(t)
+				mockTx.On("Commit").Return(errors.New("commit error"))
+				mockTx.On("Rollback").Return(nil)
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+				mockGuestRepo.On("WithTransaction", mockTx).Return(mockGuestRepo)
+				mockGuestRepo.On("BulkCreate", mock.Anything, mock.AnythingOfType("[]entities.GuestEntity")).Return(nil)
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					repo_mocks.NewGuestCacheRepositoryMock(t),
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkCreateGuestsRequestDTO{
+				Items: []dtos.CreateGuestRequestDTO{
+					{Name: "John", CreatedBy: "admin"},
+				},
+			},
+			expectError: true,
+			validate: func(t *testing.T, responseDTO *dtos.BulkCreateGuestsResponseDTO, err error) {
+				if err == nil {
+					t.Error("BulkCreate() expected Commit error")
+				}
+			},
+		},
+		{
+			name: "bulk create with BulkCreate error and rollback error",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = false
+
+				mockTx := repo_mocks.NewBoilerplateDatabaseTransactionMock(t)
+				mockTx.On("Rollback").Return(errors.New("rollback error"))
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+				mockGuestRepo.On("WithTransaction", mockTx).Return(mockGuestRepo)
+				mockGuestRepo.On("BulkCreate", mock.Anything, mock.AnythingOfType("[]entities.GuestEntity")).Return(errors.New("bulk create error"))
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					repo_mocks.NewGuestCacheRepositoryMock(t),
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkCreateGuestsRequestDTO{
+				Items: []dtos.CreateGuestRequestDTO{
+					{Name: "John", CreatedBy: "admin"},
+				},
+			},
+			expectError: true,
+			validate: func(t *testing.T, responseDTO *dtos.BulkCreateGuestsResponseDTO, err error) {
+				if err == nil {
+					t.Error("BulkCreate() expected error")
+				}
+			},
+		},
+		{
+			name: "bulk create with Commit error and rollback error",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = false
+
+				mockTx := repo_mocks.NewBoilerplateDatabaseTransactionMock(t)
+				mockTx.On("Commit").Return(errors.New("commit error"))
+				mockTx.On("Rollback").Return(errors.New("rollback error"))
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+				mockGuestRepo.On("WithTransaction", mockTx).Return(mockGuestRepo)
+				mockGuestRepo.On("BulkCreate", mock.Anything, mock.AnythingOfType("[]entities.GuestEntity")).Return(nil)
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					repo_mocks.NewGuestCacheRepositoryMock(t),
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkCreateGuestsRequestDTO{
+				Items: []dtos.CreateGuestRequestDTO{
+					{Name: "John", CreatedBy: "admin"},
+				},
+			},
+			expectError: true,
+			validate: func(t *testing.T, responseDTO *dtos.BulkCreateGuestsResponseDTO, err error) {
+				if err == nil {
+					t.Error("BulkCreate() expected Commit error")
+				}
+			},
+		},
+		{
+			name: "bulk create with cache delete error (non-fatal)",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = true
+				cfg.Guest.Cache.Keyf = "guest:%s"
+				cfg.Guest.Event.BulkCreated.Enable = false
+
+				mockTx := repo_mocks.NewBoilerplateDatabaseTransactionMock(t)
+				mockTx.On("Commit").Return(nil)
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+				mockGuestRepo.On("WithTransaction", mockTx).Return(mockGuestRepo)
+				mockGuestRepo.On("BulkCreate", mock.Anything, mock.AnythingOfType("[]entities.GuestEntity")).Return(nil)
+
+				mockCache := repo_mocks.NewGuestCacheRepositoryMock(t)
+				mockCache.On("Keys", mock.Anything, "guest:*").Return([]string{"guest:key1"}, nil)
+				mockCache.On("Delete", mock.Anything, mock.MatchedBy(func(keys []string) bool {
+					return len(keys) == 1 && keys[0] == "guest:key1"
+				})).Return(errors.New("cache delete error"))
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					mockCache,
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkCreateGuestsRequestDTO{
+				Items: []dtos.CreateGuestRequestDTO{
+					{Name: "John", CreatedBy: "admin"},
+				},
+			},
+			expectError: false,
+			validate: func(t *testing.T, responseDTO *dtos.BulkCreateGuestsResponseDTO, err error) {
+				if err != nil {
+					t.Errorf("BulkCreate() unexpected error: %v", err)
+				}
+				if responseDTO == nil {
+					t.Error("BulkCreate() expected responseDTO, got nil")
+				}
+			},
+		},
+		{
+			name: "bulk create with event publish success",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = true
+				cfg.Guest.Cache.Keyf = "guest:%s"
+				cfg.Guest.Event.BulkCreated.Enable = true
+				cfg.Guest.Event.BulkCreated.Topic = "guest.bulk.created"
+
+				mockTx := repo_mocks.NewBoilerplateDatabaseTransactionMock(t)
+				mockTx.On("Commit").Return(nil)
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+				mockGuestRepo.On("WithTransaction", mockTx).Return(mockGuestRepo)
+				mockGuestRepo.On("BulkCreate", mock.Anything, mock.AnythingOfType("[]entities.GuestEntity")).Return(nil)
+
+				mockCache := repo_mocks.NewGuestCacheRepositoryMock(t)
+				mockCache.On("Keys", mock.Anything, "guest:*").Return([]string{}, nil)
+
+				mockEventProducer := repo_mocks.NewGuestEventProducerRepositoryMock(t)
+				mockEventProducer.On("PublishBulk", mock.Anything, "guest.bulk.created", mock.Anything).Return(nil)
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					mockCache,
+					mockEventProducer,
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkCreateGuestsRequestDTO{
+				Items: []dtos.CreateGuestRequestDTO{
+					{Name: "John", CreatedBy: "admin"},
+				},
+			},
+			expectError: false,
+			validate: func(t *testing.T, responseDTO *dtos.BulkCreateGuestsResponseDTO, err error) {
+				if err != nil {
+					t.Errorf("BulkCreate() unexpected error: %v", err)
+				}
+				if responseDTO == nil {
+					t.Error("BulkCreate() expected responseDTO, got nil")
+				}
+			},
+		},
+		{
+			name: "bulk create with event publish error (non-fatal)",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = true
+				cfg.Guest.Cache.Keyf = "guest:%s"
+				cfg.Guest.Event.BulkCreated.Enable = true
+				cfg.Guest.Event.BulkCreated.Topic = "guest.bulk.created"
+
+				mockTx := repo_mocks.NewBoilerplateDatabaseTransactionMock(t)
+				mockTx.On("Commit").Return(nil)
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+				mockGuestRepo.On("WithTransaction", mockTx).Return(mockGuestRepo)
+				mockGuestRepo.On("BulkCreate", mock.Anything, mock.AnythingOfType("[]entities.GuestEntity")).Return(nil)
+
+				mockCache := repo_mocks.NewGuestCacheRepositoryMock(t)
+				mockCache.On("Keys", mock.Anything, "guest:*").Return([]string{}, nil)
+
+				mockEventProducer := repo_mocks.NewGuestEventProducerRepositoryMock(t)
+				mockEventProducer.On("PublishBulk", mock.Anything, "guest.bulk.created", mock.Anything).Return(errors.New("event publish error"))
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					mockCache,
+					mockEventProducer,
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkCreateGuestsRequestDTO{
+				Items: []dtos.CreateGuestRequestDTO{
+					{Name: "John", CreatedBy: "admin"},
+				},
+			},
+			expectError: false,
+			validate: func(t *testing.T, responseDTO *dtos.BulkCreateGuestsResponseDTO, err error) {
+				if err != nil {
+					t.Errorf("BulkCreate() unexpected error: %v", err)
+				}
+				if responseDTO == nil {
+					t.Error("BulkCreate() expected responseDTO, got nil")
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := tt.setupService(t)
+			ctx := context.Background()
+
+			responseDTO, err := service.BulkCreate(ctx, tt.requestDTO)
+
+			if tt.expectError && err == nil {
+				t.Error("expected error, got nil")
+			}
+
+			if !tt.expectError && err != nil {
+				t.Errorf("expected no error, got %v", err)
+			}
+
+			if tt.validate != nil {
+				tt.validate(t, responseDTO, err)
+			}
+		})
+	}
+}
+
+func Test_GuestService_BulkUpdate(t *testing.T) {
+	tests := []struct {
+		name         string
+		setupService func(t *testing.T) *GuestService
+		requestDTO   *dtos.BulkUpdateGuestsRequestDTO
+		expectError  bool
+		validate     func(t *testing.T, responseDTO *dtos.BulkUpdateGuestsResponseDTO, err error)
+	}{
+		{
+			name: "bulk update successfully without cache and event",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = false
+				cfg.Guest.Cache.Keyf = "guest:%s"
+				cfg.Guest.Event.Updated.Enable = false
+
+				testID := "01932293-d710-7f55-a9f6-66e6248ae72f"
+
+				mockTx := repo_mocks.NewBoilerplateDatabaseTransactionMock(t)
+				mockTx.On("Commit").Return(nil)
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("FindAll", mock.Anything, mock.AnythingOfType("*goqube.Filter"), mock.Anything, uint64(1), uint64(0), false).Return([]entities.GuestEntity{
+					{ID: uuid.FromStringOrNil(testID), Name: "Old Name", CreatedAt: time.Now().UnixMilli(), CreatedBy: "admin"},
+				}, nil)
+				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+				mockGuestRepo.On("WithTransaction", mockTx).Return(mockGuestRepo)
+				mockGuestRepo.On("BulkUpdate", mock.Anything, mock.AnythingOfType("[]entities.GuestEntity")).Return(nil)
+
+				mockCache := repo_mocks.NewGuestCacheRepositoryMock(t)
+				mockCache.On("Keys", mock.Anything, "guest:*").Return([]string{}, nil)
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					mockCache,
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkUpdateGuestsRequestDTO{
+				Items: []dtos.UpdateGuestByIDRequestDTO{
+					{ID: "01932293-d710-7f55-a9f6-66e6248ae72f", Name: "Updated Name", UpdatedBy: "admin"},
+				},
+			},
+			expectError: false,
+			validate: func(t *testing.T, responseDTO *dtos.BulkUpdateGuestsResponseDTO, err error) {
+				if err != nil {
+					t.Errorf("BulkUpdate() unexpected error: %v", err)
+				}
+				if responseDTO == nil {
+					t.Error("BulkUpdate() expected responseDTO, got nil")
+				}
+			},
+		},
+		{
+			name: "bulk update with nil requestDTO",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				return NewGuestService(
+					cfg,
+					repo_mocks.NewGuestRepositoryMock(t),
+					repo_mocks.NewGuestCacheRepositoryMock(t),
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO:  nil,
+			expectError: true,
+			validate: func(t *testing.T, responseDTO *dtos.BulkUpdateGuestsResponseDTO, err error) {
+				if err == nil {
+					t.Error("BulkUpdate() expected error for nil requestDTO")
+				}
+			},
+		},
+		{
+			name: "bulk update with validation error",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				return NewGuestService(
+					cfg,
+					repo_mocks.NewGuestRepositoryMock(t),
+					repo_mocks.NewGuestCacheRepositoryMock(t),
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkUpdateGuestsRequestDTO{
+				Items: []dtos.UpdateGuestByIDRequestDTO{
+					{ID: "", Name: "", UpdatedBy: ""},
+				},
+			},
+			expectError: true,
+			validate: func(t *testing.T, responseDTO *dtos.BulkUpdateGuestsResponseDTO, err error) {
+				if err == nil {
+					t.Error("BulkUpdate() expected validation error")
+				}
+			},
+		},
+		{
+			name: "bulk update with FindAll error",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = false
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("FindAll", mock.Anything, mock.AnythingOfType("*goqube.Filter"), mock.Anything, uint64(1), uint64(0), false).Return(nil, errors.New("find error"))
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					repo_mocks.NewGuestCacheRepositoryMock(t),
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkUpdateGuestsRequestDTO{
+				Items: []dtos.UpdateGuestByIDRequestDTO{
+					{ID: uuid.Must(uuid.NewV4()).String(), Name: "Test", UpdatedBy: "admin"},
+				},
+			},
+			expectError: true,
+			validate: func(t *testing.T, responseDTO *dtos.BulkUpdateGuestsResponseDTO, err error) {
+				if err == nil {
+					t.Error("BulkUpdate() expected FindAll error")
+				}
+			},
+		},
+		{
+			name: "bulk update with BeginTransaction error",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = false
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("FindAll", mock.Anything, mock.AnythingOfType("*goqube.Filter"), mock.Anything, uint64(1), uint64(0), false).Return([]entities.GuestEntity{
+					{ID: uuid.FromStringOrNil("01932293-d710-7f55-a9f6-66e6248ae72f"), Name: "Old", CreatedAt: time.Now().UnixMilli(), CreatedBy: "admin"},
+				}, nil)
+				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(nil, errors.New("tx error"))
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					repo_mocks.NewGuestCacheRepositoryMock(t),
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkUpdateGuestsRequestDTO{
+				Items: []dtos.UpdateGuestByIDRequestDTO{
+					{ID: "01932293-d710-7f55-a9f6-66e6248ae72f", Name: "Test", UpdatedBy: "admin"},
+				},
+			},
+			expectError: true,
+			validate: func(t *testing.T, responseDTO *dtos.BulkUpdateGuestsResponseDTO, err error) {
+				if err == nil {
+					t.Error("BulkUpdate() expected BeginTransaction error")
+				}
+			},
+		},
+		{
+			name: "bulk update with BulkUpdate error and rollback success",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = false
+
+				mockTx := repo_mocks.NewBoilerplateDatabaseTransactionMock(t)
+				mockTx.On("Rollback").Return(nil)
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("FindAll", mock.Anything, mock.AnythingOfType("*goqube.Filter"), mock.Anything, uint64(1), uint64(0), false).Return([]entities.GuestEntity{
+					{ID: uuid.FromStringOrNil("01932293-d710-7f55-a9f6-66e6248ae72f"), Name: "Old", CreatedAt: time.Now().UnixMilli(), CreatedBy: "admin"},
+				}, nil)
+				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+				mockGuestRepo.On("WithTransaction", mockTx).Return(mockGuestRepo)
+				mockGuestRepo.On("BulkUpdate", mock.Anything, mock.AnythingOfType("[]entities.GuestEntity")).Return(errors.New("bulk update error"))
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					repo_mocks.NewGuestCacheRepositoryMock(t),
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkUpdateGuestsRequestDTO{
+				Items: []dtos.UpdateGuestByIDRequestDTO{
+					{ID: "01932293-d710-7f55-a9f6-66e6248ae72f", Name: "Test", UpdatedBy: "admin"},
+				},
+			},
+			expectError: true,
+			validate: func(t *testing.T, responseDTO *dtos.BulkUpdateGuestsResponseDTO, err error) {
+				if err == nil {
+					t.Error("BulkUpdate() expected error")
+				}
+			},
+		},
+		{
+			name: "bulk update with entities not found (empty result)",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = false
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("FindAll", mock.Anything, mock.AnythingOfType("*goqube.Filter"), mock.Anything, uint64(1), uint64(0), false).Return([]entities.GuestEntity{}, nil)
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					repo_mocks.NewGuestCacheRepositoryMock(t),
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkUpdateGuestsRequestDTO{
+				Items: []dtos.UpdateGuestByIDRequestDTO{
+					{ID: uuid.Must(uuid.NewV4()).String(), Name: "Test", UpdatedBy: "admin"},
+				},
+			},
+			expectError: true,
+			validate: func(t *testing.T, responseDTO *dtos.BulkUpdateGuestsResponseDTO, err error) {
+				if err == nil {
+					t.Error("BulkUpdate() expected entities not found error")
+				}
+			},
+		},
+		{
+			name: "bulk update with entity not found in existing entities",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = false
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("FindAll", mock.Anything, mock.AnythingOfType("*goqube.Filter"), mock.Anything, uint64(1), uint64(0), false).Return([]entities.GuestEntity{
+					{ID: uuid.FromStringOrNil("11111111-1111-1111-1111-111111111111"), Name: "Other", CreatedAt: time.Now().UnixMilli(), CreatedBy: "admin"},
+				}, nil)
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					repo_mocks.NewGuestCacheRepositoryMock(t),
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkUpdateGuestsRequestDTO{
+				Items: []dtos.UpdateGuestByIDRequestDTO{
+					{ID: "22222222-2222-2222-2222-222222222222", Name: "Test", UpdatedBy: "admin"},
+				},
+			},
+			expectError: true,
+			validate: func(t *testing.T, responseDTO *dtos.BulkUpdateGuestsResponseDTO, err error) {
+				if err == nil {
+					t.Error("BulkUpdate() expected entity not found error")
+				}
+			},
+		},
+		{
+			name: "bulk update with BulkUpdate error and rollback error",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = false
+
+				mockTx := repo_mocks.NewBoilerplateDatabaseTransactionMock(t)
+				mockTx.On("Rollback").Return(errors.New("rollback error"))
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("FindAll", mock.Anything, mock.AnythingOfType("*goqube.Filter"), mock.Anything, uint64(1), uint64(0), false).Return([]entities.GuestEntity{
+					{ID: uuid.FromStringOrNil("01932293-d710-7f55-a9f6-66e6248ae72f"), Name: "Old", CreatedAt: time.Now().UnixMilli(), CreatedBy: "admin"},
+				}, nil)
+				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+				mockGuestRepo.On("WithTransaction", mockTx).Return(mockGuestRepo)
+				mockGuestRepo.On("BulkUpdate", mock.Anything, mock.AnythingOfType("[]entities.GuestEntity")).Return(errors.New("bulk update error"))
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					repo_mocks.NewGuestCacheRepositoryMock(t),
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkUpdateGuestsRequestDTO{
+				Items: []dtos.UpdateGuestByIDRequestDTO{
+					{ID: "01932293-d710-7f55-a9f6-66e6248ae72f", Name: "Test", UpdatedBy: "admin"},
+				},
+			},
+			expectError: true,
+			validate: func(t *testing.T, responseDTO *dtos.BulkUpdateGuestsResponseDTO, err error) {
+				if err == nil {
+					t.Error("BulkUpdate() expected error")
+				}
+			},
+		},
+		{
+			name: "bulk update with Commit error and rollback error",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = false
+
+				mockTx := repo_mocks.NewBoilerplateDatabaseTransactionMock(t)
+				mockTx.On("Commit").Return(errors.New("commit error"))
+				mockTx.On("Rollback").Return(errors.New("rollback error"))
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("FindAll", mock.Anything, mock.AnythingOfType("*goqube.Filter"), mock.Anything, uint64(1), uint64(0), false).Return([]entities.GuestEntity{
+					{ID: uuid.FromStringOrNil("01932293-d710-7f55-a9f6-66e6248ae72f"), Name: "Old", CreatedAt: time.Now().UnixMilli(), CreatedBy: "admin"},
+				}, nil)
+				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+				mockGuestRepo.On("WithTransaction", mockTx).Return(mockGuestRepo)
+				mockGuestRepo.On("BulkUpdate", mock.Anything, mock.AnythingOfType("[]entities.GuestEntity")).Return(nil)
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					repo_mocks.NewGuestCacheRepositoryMock(t),
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkUpdateGuestsRequestDTO{
+				Items: []dtos.UpdateGuestByIDRequestDTO{
+					{ID: "01932293-d710-7f55-a9f6-66e6248ae72f", Name: "Test", UpdatedBy: "admin"},
+				},
+			},
+			expectError: true,
+			validate: func(t *testing.T, responseDTO *dtos.BulkUpdateGuestsResponseDTO, err error) {
+				if err == nil {
+					t.Error("BulkUpdate() expected Commit error")
+				}
+			},
+		},
+		{
+			name: "bulk update with cache delete error (non-fatal)",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = true
+				cfg.Guest.Cache.Keyf = "guest:%s"
+				cfg.Guest.Event.BulkUpdated.Enable = false
+
+				mockTx := repo_mocks.NewBoilerplateDatabaseTransactionMock(t)
+				mockTx.On("Commit").Return(nil)
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("FindAll", mock.Anything, mock.AnythingOfType("*goqube.Filter"), mock.Anything, uint64(1), uint64(0), false).Return([]entities.GuestEntity{
+					{ID: uuid.FromStringOrNil("01932293-d710-7f55-a9f6-66e6248ae72f"), Name: "Old", CreatedAt: time.Now().UnixMilli(), CreatedBy: "admin"},
+				}, nil)
+				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+				mockGuestRepo.On("WithTransaction", mockTx).Return(mockGuestRepo)
+				mockGuestRepo.On("BulkUpdate", mock.Anything, mock.AnythingOfType("[]entities.GuestEntity")).Return(nil)
+
+				mockCache := repo_mocks.NewGuestCacheRepositoryMock(t)
+				mockCache.On("Keys", mock.Anything, "guest:*").Return([]string{"guest:key1"}, nil)
+				mockCache.On("Delete", mock.Anything, mock.MatchedBy(func(keys []string) bool {
+					return len(keys) == 1 && keys[0] == "guest:key1"
+				})).Return(errors.New("cache delete error"))
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					mockCache,
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkUpdateGuestsRequestDTO{
+				Items: []dtos.UpdateGuestByIDRequestDTO{
+					{ID: "01932293-d710-7f55-a9f6-66e6248ae72f", Name: "Updated Name", UpdatedBy: "admin"},
+				},
+			},
+			expectError: false,
+			validate: func(t *testing.T, responseDTO *dtos.BulkUpdateGuestsResponseDTO, err error) {
+				if err != nil {
+					t.Errorf("BulkUpdate() unexpected error: %v", err)
+				}
+				if responseDTO == nil {
+					t.Error("BulkUpdate() expected responseDTO, got nil")
+				}
+			},
+		},
+		{
+			name: "bulk update with event publish success",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = true
+				cfg.Guest.Cache.Keyf = "guest:%s"
+				cfg.Guest.Event.BulkUpdated.Enable = true
+				cfg.Guest.Event.BulkUpdated.Topic = "guest.bulk.updated"
+
+				mockTx := repo_mocks.NewBoilerplateDatabaseTransactionMock(t)
+				mockTx.On("Commit").Return(nil)
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("FindAll", mock.Anything, mock.AnythingOfType("*goqube.Filter"), mock.Anything, uint64(1), uint64(0), false).Return([]entities.GuestEntity{
+					{ID: uuid.FromStringOrNil("01932293-d710-7f55-a9f6-66e6248ae72f"), Name: "Old", CreatedAt: time.Now().UnixMilli(), CreatedBy: "admin"},
+				}, nil)
+				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+				mockGuestRepo.On("WithTransaction", mockTx).Return(mockGuestRepo)
+				mockGuestRepo.On("BulkUpdate", mock.Anything, mock.AnythingOfType("[]entities.GuestEntity")).Return(nil)
+
+				mockCache := repo_mocks.NewGuestCacheRepositoryMock(t)
+				mockCache.On("Keys", mock.Anything, "guest:*").Return([]string{}, nil)
+
+				mockEventProducer := repo_mocks.NewGuestEventProducerRepositoryMock(t)
+				mockEventProducer.On("PublishBulk", mock.Anything, "guest.bulk.updated", mock.Anything).Return(nil)
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					mockCache,
+					mockEventProducer,
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkUpdateGuestsRequestDTO{
+				Items: []dtos.UpdateGuestByIDRequestDTO{
+					{ID: "01932293-d710-7f55-a9f6-66e6248ae72f", Name: "Updated Name", UpdatedBy: "admin"},
+				},
+			},
+			expectError: false,
+			validate: func(t *testing.T, responseDTO *dtos.BulkUpdateGuestsResponseDTO, err error) {
+				if err != nil {
+					t.Errorf("BulkUpdate() unexpected error: %v", err)
+				}
+				if responseDTO == nil {
+					t.Error("BulkUpdate() expected responseDTO, got nil")
+				}
+			},
+		},
+		{
+			name: "bulk update with event publish error (non-fatal)",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = true
+				cfg.Guest.Cache.Keyf = "guest:%s"
+				cfg.Guest.Event.BulkUpdated.Enable = true
+				cfg.Guest.Event.BulkUpdated.Topic = "guest.bulk.updated"
+
+				mockTx := repo_mocks.NewBoilerplateDatabaseTransactionMock(t)
+				mockTx.On("Commit").Return(nil)
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("FindAll", mock.Anything, mock.AnythingOfType("*goqube.Filter"), mock.Anything, uint64(1), uint64(0), false).Return([]entities.GuestEntity{
+					{ID: uuid.FromStringOrNil("01932293-d710-7f55-a9f6-66e6248ae72f"), Name: "Old", CreatedAt: time.Now().UnixMilli(), CreatedBy: "admin"},
+				}, nil)
+				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+				mockGuestRepo.On("WithTransaction", mockTx).Return(mockGuestRepo)
+				mockGuestRepo.On("BulkUpdate", mock.Anything, mock.AnythingOfType("[]entities.GuestEntity")).Return(nil)
+
+				mockCache := repo_mocks.NewGuestCacheRepositoryMock(t)
+				mockCache.On("Keys", mock.Anything, "guest:*").Return([]string{}, nil)
+
+				mockEventProducer := repo_mocks.NewGuestEventProducerRepositoryMock(t)
+				mockEventProducer.On("PublishBulk", mock.Anything, "guest.bulk.updated", mock.Anything).Return(errors.New("event publish error"))
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					mockCache,
+					mockEventProducer,
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkUpdateGuestsRequestDTO{
+				Items: []dtos.UpdateGuestByIDRequestDTO{
+					{ID: "01932293-d710-7f55-a9f6-66e6248ae72f", Name: "Updated Name", UpdatedBy: "admin"},
+				},
+			},
+			expectError: false,
+			validate: func(t *testing.T, responseDTO *dtos.BulkUpdateGuestsResponseDTO, err error) {
+				if err != nil {
+					t.Errorf("BulkUpdate() unexpected error: %v", err)
+				}
+				if responseDTO == nil {
+					t.Error("BulkUpdate() expected responseDTO, got nil")
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := tt.setupService(t)
+			ctx := context.Background()
+
+			responseDTO, err := service.BulkUpdate(ctx, tt.requestDTO)
+
+			if tt.expectError && err == nil {
+				t.Error("expected error, got nil")
+			}
+
+			if !tt.expectError && err != nil {
+				t.Errorf("expected no error, got %v", err)
+			}
+
+			if tt.validate != nil {
+				tt.validate(t, responseDTO, err)
+			}
+		})
+	}
+}
+
+func Test_GuestService_BulkDelete(t *testing.T) {
+	tests := []struct {
+		name         string
+		setupService func(t *testing.T) *GuestService
+		requestDTO   *dtos.BulkDeleteGuestsRequestDTO
+		expectError  bool
+		validate     func(t *testing.T, err error)
+	}{
+		{
+			name: "bulk delete successfully without cache and event",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = false
+				cfg.Guest.Cache.Keyf = "guest:%s"
+				cfg.Guest.Event.BulkDeleted.Enable = false
+
+				mockTx := repo_mocks.NewBoilerplateDatabaseTransactionMock(t)
+				mockTx.On("Commit").Return(nil)
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("FindAll", mock.Anything, mock.AnythingOfType("*goqube.Filter"), mock.Anything, uint64(1), uint64(0), false).Return([]entities.GuestEntity{
+					{ID: uuid.Must(uuid.NewV4()), Name: "Test", CreatedAt: time.Now().UnixMilli(), CreatedBy: "admin"},
+				}, nil)
+				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+				mockGuestRepo.On("WithTransaction", mockTx).Return(mockGuestRepo)
+				mockGuestRepo.On("BulkUpdate", mock.Anything, mock.AnythingOfType("[]entities.GuestEntity")).Return(nil)
+
+				mockCache := repo_mocks.NewGuestCacheRepositoryMock(t)
+				mockCache.On("Keys", mock.Anything, "guest:*").Return([]string{}, nil)
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					mockCache,
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkDeleteGuestsRequestDTO{
+				IDs:       []string{uuid.Must(uuid.NewV4()).String()},
+				DeletedBy: "admin",
+			},
+			expectError: false,
+			validate: func(t *testing.T, err error) {
+				if err != nil {
+					t.Errorf("BulkDelete() unexpected error: %v", err)
+				}
+			},
+		},
+		{
+			name: "bulk delete with nil requestDTO",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				return NewGuestService(
+					cfg,
+					repo_mocks.NewGuestRepositoryMock(t),
+					repo_mocks.NewGuestCacheRepositoryMock(t),
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO:  nil,
+			expectError: true,
+			validate: func(t *testing.T, err error) {
+				if err == nil {
+					t.Error("BulkDelete() expected error for nil requestDTO")
+				}
+			},
+		},
+		{
+			name: "bulk delete with validation error",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				return NewGuestService(
+					cfg,
+					repo_mocks.NewGuestRepositoryMock(t),
+					repo_mocks.NewGuestCacheRepositoryMock(t),
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkDeleteGuestsRequestDTO{
+				IDs:       []string{},
+				DeletedBy: "admin",
+			},
+			expectError: true,
+			validate: func(t *testing.T, err error) {
+				if err == nil {
+					t.Error("BulkDelete() expected validation error")
+				}
+			},
+		},
+		{
+			name: "bulk delete with FindAll error",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = false
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("FindAll", mock.Anything, mock.AnythingOfType("*goqube.Filter"), mock.Anything, uint64(1), uint64(0), false).Return(nil, errors.New("find error"))
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					repo_mocks.NewGuestCacheRepositoryMock(t),
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkDeleteGuestsRequestDTO{
+				IDs:       []string{uuid.Must(uuid.NewV4()).String()},
+				DeletedBy: "admin",
+			},
+			expectError: true,
+			validate: func(t *testing.T, err error) {
+				if err == nil {
+					t.Error("BulkDelete() expected FindAll error")
+				}
+			},
+		},
+		{
+			name: "bulk delete with BeginTransaction error",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = false
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("FindAll", mock.Anything, mock.AnythingOfType("*goqube.Filter"), mock.Anything, uint64(1), uint64(0), false).Return([]entities.GuestEntity{
+					{ID: uuid.Must(uuid.NewV4()), Name: "Test", CreatedAt: time.Now().UnixMilli(), CreatedBy: "admin"},
+				}, nil)
+				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(nil, errors.New("tx error"))
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					repo_mocks.NewGuestCacheRepositoryMock(t),
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkDeleteGuestsRequestDTO{
+				IDs:       []string{uuid.Must(uuid.NewV4()).String()},
+				DeletedBy: "admin",
+			},
+			expectError: true,
+			validate: func(t *testing.T, err error) {
+				if err == nil {
+					t.Error("BulkDelete() expected BeginTransaction error")
+				}
+			},
+		},
+		{
+			name: "bulk delete with BulkUpdate error and rollback success",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = false
+
+				mockTx := repo_mocks.NewBoilerplateDatabaseTransactionMock(t)
+				mockTx.On("Rollback").Return(nil)
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("FindAll", mock.Anything, mock.AnythingOfType("*goqube.Filter"), mock.Anything, uint64(1), uint64(0), false).Return([]entities.GuestEntity{
+					{ID: uuid.Must(uuid.NewV4()), Name: "Test", CreatedAt: time.Now().UnixMilli(), CreatedBy: "admin"},
+				}, nil)
+				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+				mockGuestRepo.On("WithTransaction", mockTx).Return(mockGuestRepo)
+				mockGuestRepo.On("BulkUpdate", mock.Anything, mock.AnythingOfType("[]entities.GuestEntity")).Return(errors.New("bulk update error"))
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					repo_mocks.NewGuestCacheRepositoryMock(t),
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkDeleteGuestsRequestDTO{
+				IDs:       []string{uuid.Must(uuid.NewV4()).String()},
+				DeletedBy: "admin",
+			},
+			expectError: true,
+			validate: func(t *testing.T, err error) {
+				if err == nil {
+					t.Error("BulkDelete() expected error")
+				}
+			},
+		},
+		{
+			name: "bulk delete with Commit error and rollback success",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = false
+
+				mockTx := repo_mocks.NewBoilerplateDatabaseTransactionMock(t)
+				mockTx.On("Commit").Return(errors.New("commit error"))
+				mockTx.On("Rollback").Return(nil)
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("FindAll", mock.Anything, mock.AnythingOfType("*goqube.Filter"), mock.Anything, uint64(1), uint64(0), false).Return([]entities.GuestEntity{
+					{ID: uuid.Must(uuid.NewV4()), Name: "Test", CreatedAt: time.Now().UnixMilli(), CreatedBy: "admin"},
+				}, nil)
+				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+				mockGuestRepo.On("WithTransaction", mockTx).Return(mockGuestRepo)
+				mockGuestRepo.On("BulkUpdate", mock.Anything, mock.AnythingOfType("[]entities.GuestEntity")).Return(nil)
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					repo_mocks.NewGuestCacheRepositoryMock(t),
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkDeleteGuestsRequestDTO{
+				IDs:       []string{uuid.Must(uuid.NewV4()).String()},
+				DeletedBy: "admin",
+			},
+			expectError: true,
+			validate: func(t *testing.T, err error) {
+				if err == nil {
+					t.Error("BulkDelete() expected Commit error")
+				}
+			},
+		},
+		{
+			name: "bulk delete with entity not found in existing entities",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = false
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("FindAll", mock.Anything, mock.AnythingOfType("*goqube.Filter"), mock.Anything, uint64(1), uint64(0), false).Return([]entities.GuestEntity{}, nil)
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					repo_mocks.NewGuestCacheRepositoryMock(t),
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkDeleteGuestsRequestDTO{
+				IDs:       []string{uuid.Must(uuid.NewV4()).String()},
+				DeletedBy: "admin",
+			},
+			expectError: true,
+			validate: func(t *testing.T, err error) {
+				if err == nil {
+					t.Error("BulkDelete() expected entity not found error")
+				}
+			},
+		},
+		{
+			name: "bulk delete with BulkUpdate error and rollback error",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = false
+
+				mockTx := repo_mocks.NewBoilerplateDatabaseTransactionMock(t)
+				mockTx.On("Rollback").Return(errors.New("rollback error"))
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("FindAll", mock.Anything, mock.AnythingOfType("*goqube.Filter"), mock.Anything, uint64(1), uint64(0), false).Return([]entities.GuestEntity{
+					{ID: uuid.Must(uuid.NewV4()), Name: "Test", CreatedAt: time.Now().UnixMilli(), CreatedBy: "admin"},
+				}, nil)
+				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+				mockGuestRepo.On("WithTransaction", mockTx).Return(mockGuestRepo)
+				mockGuestRepo.On("BulkUpdate", mock.Anything, mock.AnythingOfType("[]entities.GuestEntity")).Return(errors.New("bulk update error"))
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					repo_mocks.NewGuestCacheRepositoryMock(t),
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkDeleteGuestsRequestDTO{
+				IDs:       []string{uuid.Must(uuid.NewV4()).String()},
+				DeletedBy: "admin",
+			},
+			expectError: true,
+			validate: func(t *testing.T, err error) {
+				if err == nil {
+					t.Error("BulkDelete() expected error")
+				}
+			},
+		},
+		{
+			name: "bulk delete with Commit error and rollback error",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = false
+
+				mockTx := repo_mocks.NewBoilerplateDatabaseTransactionMock(t)
+				mockTx.On("Commit").Return(errors.New("commit error"))
+				mockTx.On("Rollback").Return(errors.New("rollback error"))
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("FindAll", mock.Anything, mock.AnythingOfType("*goqube.Filter"), mock.Anything, uint64(1), uint64(0), false).Return([]entities.GuestEntity{
+					{ID: uuid.Must(uuid.NewV4()), Name: "Test", CreatedAt: time.Now().UnixMilli(), CreatedBy: "admin"},
+				}, nil)
+				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+				mockGuestRepo.On("WithTransaction", mockTx).Return(mockGuestRepo)
+				mockGuestRepo.On("BulkUpdate", mock.Anything, mock.AnythingOfType("[]entities.GuestEntity")).Return(nil)
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					repo_mocks.NewGuestCacheRepositoryMock(t),
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkDeleteGuestsRequestDTO{
+				IDs:       []string{uuid.Must(uuid.NewV4()).String()},
+				DeletedBy: "admin",
+			},
+			expectError: true,
+			validate: func(t *testing.T, err error) {
+				if err == nil {
+					t.Error("BulkDelete() expected Commit error")
+				}
+			},
+		},
+		{
+			name: "bulk delete with cache delete error (non-fatal)",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = true
+				cfg.Guest.Cache.Keyf = "guest:%s"
+				cfg.Guest.Event.BulkDeleted.Enable = false
+
+				mockTx := repo_mocks.NewBoilerplateDatabaseTransactionMock(t)
+				mockTx.On("Commit").Return(nil)
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("FindAll", mock.Anything, mock.AnythingOfType("*goqube.Filter"), mock.Anything, uint64(1), uint64(0), false).Return([]entities.GuestEntity{
+					{ID: uuid.Must(uuid.NewV4()), Name: "Test", CreatedAt: time.Now().UnixMilli(), CreatedBy: "admin"},
+				}, nil)
+				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+				mockGuestRepo.On("WithTransaction", mockTx).Return(mockGuestRepo)
+				mockGuestRepo.On("BulkUpdate", mock.Anything, mock.AnythingOfType("[]entities.GuestEntity")).Return(nil)
+
+				mockCache := repo_mocks.NewGuestCacheRepositoryMock(t)
+				mockCache.On("Keys", mock.Anything, "guest:*").Return([]string{"guest:key1"}, nil)
+				mockCache.On("Delete", mock.Anything, mock.MatchedBy(func(keys []string) bool {
+					return len(keys) == 1 && keys[0] == "guest:key1"
+				})).Return(errors.New("cache delete error"))
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					mockCache,
+					repo_mocks.NewGuestEventProducerRepositoryMock(t),
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkDeleteGuestsRequestDTO{
+				IDs:       []string{uuid.Must(uuid.NewV4()).String()},
+				DeletedBy: "admin",
+			},
+			expectError: false,
+			validate: func(t *testing.T, err error) {
+				if err != nil {
+					t.Errorf("BulkDelete() unexpected error: %v", err)
+				}
+			},
+		},
+		{
+			name: "bulk delete with event publish success",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = true
+				cfg.Guest.Cache.Keyf = "guest:%s"
+				cfg.Guest.Event.BulkDeleted.Enable = true
+				cfg.Guest.Event.BulkDeleted.Topic = "guest.bulk.deleted"
+
+				mockTx := repo_mocks.NewBoilerplateDatabaseTransactionMock(t)
+				mockTx.On("Commit").Return(nil)
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("FindAll", mock.Anything, mock.AnythingOfType("*goqube.Filter"), mock.Anything, uint64(1), uint64(0), false).Return([]entities.GuestEntity{
+					{ID: uuid.Must(uuid.NewV4()), Name: "Test", CreatedAt: time.Now().UnixMilli(), CreatedBy: "admin"},
+				}, nil)
+				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+				mockGuestRepo.On("WithTransaction", mockTx).Return(mockGuestRepo)
+				mockGuestRepo.On("BulkUpdate", mock.Anything, mock.AnythingOfType("[]entities.GuestEntity")).Return(nil)
+
+				mockCache := repo_mocks.NewGuestCacheRepositoryMock(t)
+				mockCache.On("Keys", mock.Anything, "guest:*").Return([]string{}, nil)
+
+				mockEventProducer := repo_mocks.NewGuestEventProducerRepositoryMock(t)
+				mockEventProducer.On("PublishBulk", mock.Anything, "guest.bulk.deleted", mock.Anything).Return(nil)
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					mockCache,
+					mockEventProducer,
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkDeleteGuestsRequestDTO{
+				IDs:       []string{uuid.Must(uuid.NewV4()).String()},
+				DeletedBy: "admin",
+			},
+			expectError: false,
+			validate: func(t *testing.T, err error) {
+				if err != nil {
+					t.Errorf("BulkDelete() unexpected error: %v", err)
+				}
+			},
+		},
+		{
+			name: "bulk delete with event publish error (non-fatal)",
+			setupService: func(t *testing.T) *GuestService {
+				cfg := &configs.Config{}
+				cfg.Guest.Cache.Enable = true
+				cfg.Guest.Cache.Keyf = "guest:%s"
+				cfg.Guest.Event.BulkDeleted.Enable = true
+				cfg.Guest.Event.BulkDeleted.Topic = "guest.bulk.deleted"
+
+				mockTx := repo_mocks.NewBoilerplateDatabaseTransactionMock(t)
+				mockTx.On("Commit").Return(nil)
+
+				mockGuestRepo := repo_mocks.NewGuestRepositoryMock(t)
+				mockGuestRepo.On("FindAll", mock.Anything, mock.AnythingOfType("*goqube.Filter"), mock.Anything, uint64(1), uint64(0), false).Return([]entities.GuestEntity{
+					{ID: uuid.Must(uuid.NewV4()), Name: "Test", CreatedAt: time.Now().UnixMilli(), CreatedBy: "admin"},
+				}, nil)
+				mockGuestRepo.On("BeginTransaction", mock.Anything).Return(mockTx, nil)
+				mockGuestRepo.On("WithTransaction", mockTx).Return(mockGuestRepo)
+				mockGuestRepo.On("BulkUpdate", mock.Anything, mock.AnythingOfType("[]entities.GuestEntity")).Return(nil)
+
+				mockCache := repo_mocks.NewGuestCacheRepositoryMock(t)
+				mockCache.On("Keys", mock.Anything, "guest:*").Return([]string{}, nil)
+
+				mockEventProducer := repo_mocks.NewGuestEventProducerRepositoryMock(t)
+				mockEventProducer.On("PublishBulk", mock.Anything, "guest.bulk.deleted", mock.Anything).Return(errors.New("event publish error"))
+
+				return NewGuestService(
+					cfg,
+					mockGuestRepo,
+					mockCache,
+					mockEventProducer,
+					repo_mocks.NewWebhookSiteRepositoryMock(t),
+				)
+			},
+			requestDTO: &dtos.BulkDeleteGuestsRequestDTO{
+				IDs:       []string{uuid.Must(uuid.NewV4()).String()},
+				DeletedBy: "admin",
+			},
+			expectError: false,
+			validate: func(t *testing.T, err error) {
+				if err != nil {
+					t.Errorf("BulkDelete() unexpected error: %v", err)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := tt.setupService(t)
+			ctx := context.Background()
+
+			err := service.BulkDelete(ctx, tt.requestDTO)
+
+			if tt.expectError && err == nil {
+				t.Error("expected error, got nil")
+			}
+
+			if !tt.expectError && err != nil {
+				t.Errorf("expected no error, got %v", err)
+			}
+
+			if tt.validate != nil {
+				tt.validate(t, err)
+			}
+		})
+	}
+}

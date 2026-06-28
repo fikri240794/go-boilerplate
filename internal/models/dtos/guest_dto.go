@@ -222,3 +222,88 @@ func (dto *UpdateGuestByIDRequestDTO) ToExistingEntity(existingEntity *entities.
 
 	return existingEntity
 }
+
+type BulkCreateGuestsRequestDTO struct {
+	Items []CreateGuestRequestDTO `json:"items" validate:"required,min=1,dive"`
+}
+
+func (dto *BulkCreateGuestsRequestDTO) Validate() error {
+	return validator.ValidateStruct(dto)
+}
+
+func (dto *BulkCreateGuestsRequestDTO) ToEntities() []entities.GuestEntity {
+	var entities_ []entities.GuestEntity
+
+	for i := range dto.Items {
+		entities_ = append(entities_, *dto.Items[i].ToEntity())
+	}
+
+	return entities_
+}
+
+type BulkCreateGuestsResponseDTO struct {
+	Guests []GuestResponseDTO
+}
+
+func NewBulkCreateGuestsResponseDTO(entities_ []entities.GuestEntity) *BulkCreateGuestsResponseDTO {
+	var responseDTO *BulkCreateGuestsResponseDTO = &BulkCreateGuestsResponseDTO{}
+
+	if len(entities_) <= 0 {
+		return responseDTO
+	}
+
+	for i := range entities_ {
+		responseDTO.Guests = append(responseDTO.Guests, *NewGuestResponseDTO(&entities_[i]))
+	}
+
+	return responseDTO
+}
+
+type BulkUpdateGuestsRequestDTO struct {
+	Items []UpdateGuestByIDRequestDTO `json:"items" validate:"required,min=1,dive"`
+}
+
+func (dto *BulkUpdateGuestsRequestDTO) Validate() error {
+	return validator.ValidateStruct(dto)
+}
+
+func (dto *BulkUpdateGuestsRequestDTO) ToIDs() []string {
+	var ids []string
+
+	for i := range dto.Items {
+		ids = append(ids, dto.Items[i].ID)
+	}
+
+	return ids
+}
+
+type BulkUpdateGuestsResponseDTO struct {
+	Guests []GuestResponseDTO
+}
+
+func NewBulkUpdateGuestsResponseDTO(entities_ []entities.GuestEntity) *BulkUpdateGuestsResponseDTO {
+	var responseDTO *BulkUpdateGuestsResponseDTO = &BulkUpdateGuestsResponseDTO{}
+
+	if len(entities_) <= 0 {
+		return responseDTO
+	}
+
+	for i := range entities_ {
+		responseDTO.Guests = append(responseDTO.Guests, *NewGuestResponseDTO(&entities_[i]))
+	}
+
+	return responseDTO
+}
+
+type BulkDeleteGuestsRequestDTO struct {
+	IDs       []string `json:"ids" validate:"required,min=1,dive,uuid_rfc4122"`
+	DeletedBy string   `json:"deleted_by" validate:"required"`
+}
+
+func (dto *BulkDeleteGuestsRequestDTO) Validate() error {
+	return validator.ValidateStruct(dto)
+}
+
+func (dto *BulkDeleteGuestsRequestDTO) ToIDs() []string {
+	return dto.IDs
+}

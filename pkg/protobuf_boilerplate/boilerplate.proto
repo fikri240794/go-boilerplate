@@ -47,10 +47,34 @@ message UpdateGuestByIDRequestVM {
     string address = 3;
 }
 
+message BulkCreateGuestsRequestVM {
+    repeated CreateGuestRequestVM items = 1;
+}
+
+message BulkCreateGuestsResponseVM {
+    repeated GuestResponseVM data = 1;
+}
+
+message BulkUpdateGuestsRequestVM {
+    repeated UpdateGuestByIDRequestVM items = 1;
+}
+
+message BulkUpdateGuestsResponseVM {
+    repeated GuestResponseVM data = 1;
+}
+
+message BulkDeleteGuestsRequestVM {
+    repeated string ids = 1;
+}
+
 service Boilerplate {
     rpc CreateGuest(CreateGuestRequestVM) returns (GuestResponseVM);
     rpc DeleteGuestByID(DeleteGuestByIDRequestVM) returns (google.protobuf.Empty);
     rpc FindAllGuest(FindAllGuestRequestVM) returns (FindAllGuestResponseVM);
     rpc FindGuestByID(FindGuestByIDRequestVM) returns (GuestResponseVM);
     rpc UpdateGuestByID(UpdateGuestByIDRequestVM) returns (GuestResponseVM);
+
+    rpc BulkCreateGuests(BulkCreateGuestsRequestVM) returns (BulkCreateGuestsResponseVM);
+    rpc BulkUpdateGuests(BulkUpdateGuestsRequestVM) returns (BulkUpdateGuestsResponseVM);
+    rpc BulkDeleteGuests(BulkDeleteGuestsRequestVM) returns (google.protobuf.Empty);
 }

@@ -413,9 +413,13 @@ func (r *InMemoryDatabaseRepository[TEntity]) SetCount(ctx context.Context, key 
 
 func (r *InMemoryDatabaseRepository[TEntity]) Unlock(ctx context.Context, key string) error {
 	var (
+		span      trace.Span
 		logFields map[string]interface{}
 		err       error
 	)
+
+	ctx, span = tracer.Start(ctx, "[InMemoryDatabaseRepository][Unlock]")
+	defer span.End()
 
 	logFields = map[string]interface{}{
 		"key": key,

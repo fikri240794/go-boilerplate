@@ -440,3 +440,257 @@ func TestUpdateGuestByIDRequestVMToDTO(t *testing.T) {
 		})
 	}
 }
+
+func TestBulkCreateGuestsRequestVMToDTO(t *testing.T) {
+	tests := []struct {
+		name      string
+		setupVM   func(t *testing.T) *protobuf_boilerplate.BulkCreateGuestsRequestVM
+		createdBy string
+		validate  func(t *testing.T, dto *dtos.BulkCreateGuestsRequestDTO)
+	}{
+		{
+			name: "should_convert_single_item",
+			setupVM: func(t *testing.T) *protobuf_boilerplate.BulkCreateGuestsRequestVM {
+				return &protobuf_boilerplate.BulkCreateGuestsRequestVM{
+					Items: []*protobuf_boilerplate.CreateGuestRequestVM{
+						{Name: "John Doe", Address: "123 Main St"},
+					},
+				}
+			},
+			createdBy: "admin",
+			validate: func(t *testing.T, dto *dtos.BulkCreateGuestsRequestDTO) {
+				assert.NotNil(t, dto)
+				assert.Len(t, dto.Items, 1)
+				assert.Equal(t, "John Doe", dto.Items[0].Name)
+				assert.Equal(t, "123 Main St", dto.Items[0].Address)
+				assert.Equal(t, "admin", dto.Items[0].CreatedBy)
+			},
+		},
+		{
+			name: "should_convert_multiple_items",
+			setupVM: func(t *testing.T) *protobuf_boilerplate.BulkCreateGuestsRequestVM {
+				return &protobuf_boilerplate.BulkCreateGuestsRequestVM{
+					Items: []*protobuf_boilerplate.CreateGuestRequestVM{
+						{Name: "John Doe"},
+						{Name: "Jane Smith", Address: "456 Oak Ave"},
+					},
+				}
+			},
+			createdBy: "system",
+			validate: func(t *testing.T, dto *dtos.BulkCreateGuestsRequestDTO) {
+				assert.NotNil(t, dto)
+				assert.Len(t, dto.Items, 2)
+				assert.Equal(t, "John Doe", dto.Items[0].Name)
+				assert.Equal(t, "Jane Smith", dto.Items[1].Name)
+				assert.Equal(t, "456 Oak Ave", dto.Items[1].Address)
+			},
+		},
+		{
+			name: "should_convert_empty_items",
+			setupVM: func(t *testing.T) *protobuf_boilerplate.BulkCreateGuestsRequestVM {
+				return &protobuf_boilerplate.BulkCreateGuestsRequestVM{}
+			},
+			createdBy: "admin",
+			validate: func(t *testing.T, dto *dtos.BulkCreateGuestsRequestDTO) {
+				assert.NotNil(t, dto)
+				assert.Len(t, dto.Items, 0)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vm := tt.setupVM(t)
+			dto := BulkCreateGuestsRequestVMToDTO(vm, tt.createdBy)
+			tt.validate(t, dto)
+		})
+	}
+}
+
+func TestNewBulkCreateGuestsResponseVM(t *testing.T) {
+	tests := []struct {
+		name     string
+		setupDTO func(t *testing.T) *dtos.BulkCreateGuestsResponseDTO
+		validate func(t *testing.T, vm *protobuf_boilerplate.BulkCreateGuestsResponseVM)
+	}{
+		{
+			name: "should_convert_with_guests",
+			setupDTO: func(t *testing.T) *dtos.BulkCreateGuestsResponseDTO {
+				return &dtos.BulkCreateGuestsResponseDTO{
+					Guests: []dtos.GuestResponseDTO{
+						{ID: "id-1", Name: "John", CreatedBy: "admin"},
+						{ID: "id-2", Name: "Jane", CreatedBy: "system"},
+					},
+				}
+			},
+			validate: func(t *testing.T, vm *protobuf_boilerplate.BulkCreateGuestsResponseVM) {
+				assert.NotNil(t, vm)
+				assert.Len(t, vm.Data, 2)
+				assert.Equal(t, "John", vm.Data[0].Name)
+				assert.Equal(t, "Jane", vm.Data[1].Name)
+			},
+		},
+		{
+			name: "should_convert_with_empty_guests",
+			setupDTO: func(t *testing.T) *dtos.BulkCreateGuestsResponseDTO {
+				return &dtos.BulkCreateGuestsResponseDTO{
+					Guests: []dtos.GuestResponseDTO{},
+				}
+			},
+			validate: func(t *testing.T, vm *protobuf_boilerplate.BulkCreateGuestsResponseVM) {
+				assert.NotNil(t, vm)
+				assert.Len(t, vm.Data, 0)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dto := tt.setupDTO(t)
+			vm := NewBulkCreateGuestsResponseVM(dto)
+			tt.validate(t, vm)
+		})
+	}
+}
+
+func TestBulkUpdateGuestsRequestVMToDTO(t *testing.T) {
+	tests := []struct {
+		name      string
+		setupVM   func(t *testing.T) *protobuf_boilerplate.BulkUpdateGuestsRequestVM
+		updatedBy string
+		validate  func(t *testing.T, dto *dtos.BulkUpdateGuestsRequestDTO)
+	}{
+		{
+			name: "should_convert_single_item",
+			setupVM: func(t *testing.T) *protobuf_boilerplate.BulkUpdateGuestsRequestVM {
+				return &protobuf_boilerplate.BulkUpdateGuestsRequestVM{
+					Items: []*protobuf_boilerplate.UpdateGuestByIDRequestVM{
+						{Id: "id-1", Name: "Updated Name", Address: "123 Main St"},
+					},
+				}
+			},
+			updatedBy: "admin",
+			validate: func(t *testing.T, dto *dtos.BulkUpdateGuestsRequestDTO) {
+				assert.NotNil(t, dto)
+				assert.Len(t, dto.Items, 1)
+				assert.Equal(t, "id-1", dto.Items[0].ID)
+				assert.Equal(t, "Updated Name", dto.Items[0].Name)
+				assert.Equal(t, "123 Main St", dto.Items[0].Address)
+				assert.Equal(t, "admin", dto.Items[0].UpdatedBy)
+			},
+		},
+		{
+			name: "should_convert_multiple_items",
+			setupVM: func(t *testing.T) *protobuf_boilerplate.BulkUpdateGuestsRequestVM {
+				return &protobuf_boilerplate.BulkUpdateGuestsRequestVM{
+					Items: []*protobuf_boilerplate.UpdateGuestByIDRequestVM{
+						{Id: "id-1", Name: "Name 1"},
+						{Id: "id-2", Name: "Name 2"},
+					},
+				}
+			},
+			updatedBy: "system",
+			validate: func(t *testing.T, dto *dtos.BulkUpdateGuestsRequestDTO) {
+				assert.Len(t, dto.Items, 2)
+				assert.Equal(t, "Name 1", dto.Items[0].Name)
+				assert.Equal(t, "Name 2", dto.Items[1].Name)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vm := tt.setupVM(t)
+			dto := BulkUpdateGuestsRequestVMToDTO(vm, tt.updatedBy)
+			tt.validate(t, dto)
+		})
+	}
+}
+
+func TestNewBulkUpdateGuestsResponseVM(t *testing.T) {
+	tests := []struct {
+		name     string
+		setupDTO func(t *testing.T) *dtos.BulkUpdateGuestsResponseDTO
+		validate func(t *testing.T, vm *protobuf_boilerplate.BulkUpdateGuestsResponseVM)
+	}{
+		{
+			name: "should_convert_with_guests",
+			setupDTO: func(t *testing.T) *dtos.BulkUpdateGuestsResponseDTO {
+				return &dtos.BulkUpdateGuestsResponseDTO{
+					Guests: []dtos.GuestResponseDTO{
+						{ID: "id-1", Name: "Updated John"},
+					},
+				}
+			},
+			validate: func(t *testing.T, vm *protobuf_boilerplate.BulkUpdateGuestsResponseVM) {
+				assert.NotNil(t, vm)
+				assert.Len(t, vm.Data, 1)
+				assert.Equal(t, "Updated John", vm.Data[0].Name)
+			},
+		},
+		{
+			name: "should_convert_with_empty_guests",
+			setupDTO: func(t *testing.T) *dtos.BulkUpdateGuestsResponseDTO {
+				return &dtos.BulkUpdateGuestsResponseDTO{
+					Guests: []dtos.GuestResponseDTO{},
+				}
+			},
+			validate: func(t *testing.T, vm *protobuf_boilerplate.BulkUpdateGuestsResponseVM) {
+				assert.NotNil(t, vm)
+				assert.Len(t, vm.Data, 0)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dto := tt.setupDTO(t)
+			vm := NewBulkUpdateGuestsResponseVM(dto)
+			tt.validate(t, vm)
+		})
+	}
+}
+
+func TestBulkDeleteGuestsRequestVMToDTO(t *testing.T) {
+	tests := []struct {
+		name      string
+		setupVM   func(t *testing.T) *protobuf_boilerplate.BulkDeleteGuestsRequestVM
+		deletedBy string
+		validate  func(t *testing.T, dto *dtos.BulkDeleteGuestsRequestDTO)
+	}{
+		{
+			name: "should_convert_with_ids",
+			setupVM: func(t *testing.T) *protobuf_boilerplate.BulkDeleteGuestsRequestVM {
+				return &protobuf_boilerplate.BulkDeleteGuestsRequestVM{
+					Ids: []string{"id-1", "id-2"},
+				}
+			},
+			deletedBy: "admin",
+			validate: func(t *testing.T, dto *dtos.BulkDeleteGuestsRequestDTO) {
+				assert.NotNil(t, dto)
+				assert.Equal(t, []string{"id-1", "id-2"}, dto.IDs)
+				assert.Equal(t, "admin", dto.DeletedBy)
+			},
+		},
+		{
+			name: "should_convert_with_empty_ids",
+			setupVM: func(t *testing.T) *protobuf_boilerplate.BulkDeleteGuestsRequestVM {
+				return &protobuf_boilerplate.BulkDeleteGuestsRequestVM{}
+			},
+			deletedBy: "system",
+			validate: func(t *testing.T, dto *dtos.BulkDeleteGuestsRequestDTO) {
+				assert.NotNil(t, dto)
+				assert.Len(t, dto.IDs, 0)
+				assert.Equal(t, "system", dto.DeletedBy)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vm := tt.setupVM(t)
+			dto := BulkDeleteGuestsRequestVMToDTO(vm, tt.deletedBy)
+			tt.validate(t, dto)
+		})
+	}
+}

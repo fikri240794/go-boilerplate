@@ -679,3 +679,425 @@ func TestGuestHandler_HandleUpdated(t *testing.T) {
 		})
 	}
 }
+
+func TestGuestHandler_HandleBulkCreated(t *testing.T) {
+	tests := []struct {
+		name         string
+		setupContext func() context.Context
+		setupMessage func() *nsq.Message
+		setupMock    func(mock *mocks.GuestServiceMock)
+		wantErr      bool
+		validateErr  func(t *testing.T, err error)
+	}{
+		{
+			name: "should_handle_bulk_created_event_successfully",
+			setupContext: func() context.Context {
+				ctx := context.Background()
+				ctx = context.WithValue(ctx, constants.ContextKeyRequestID, "req-bulk-1")
+				return ctx
+			},
+			setupMessage: func() *nsq.Message {
+				eventVM := vms.EventRequestVM[[]vms.GuestEventRequestVM]{
+					Name: "guest.bulk.created",
+					Message: &[]vms.GuestEventRequestVM{
+						{
+							ID:        "guest-1",
+							Name:      "John Doe",
+							Address:   "123 Main St",
+							CreatedAt: 1700000000,
+							CreatedBy: "user-1",
+						},
+					},
+					TracerPropagator: map[string]string{
+						"traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+					},
+				}
+				body, _ := json.Marshal(eventVM)
+				return &nsq.Message{Body: body}
+			},
+			setupMock: func(mockService *mocks.GuestServiceMock) {
+				mockService.On("ProcessEvent", mock.Anything, &dtos.GuestEventRequestDTO{
+					ID:        "guest-1",
+					Name:      "John Doe",
+					Address:   "123 Main St",
+					CreatedAt: 1700000000,
+					CreatedBy: "user-1",
+				}).Return(&dtos.GuestEventResponseDTO{
+					ID: "guest-1",
+				}, nil)
+			},
+			wantErr: false,
+		},
+		{
+			name: "should_return_error_when_bulk_created_unmarshal_fails",
+			setupContext: func() context.Context {
+				ctx := context.Background()
+				ctx = context.WithValue(ctx, constants.ContextKeyRequestID, "req-bulk-2")
+				return ctx
+			},
+			setupMessage: func() *nsq.Message {
+				return &nsq.Message{Body: []byte("invalid json")}
+			},
+			setupMock: func(mock *mocks.GuestServiceMock) {},
+			wantErr:   true,
+			validateErr: func(t *testing.T, err error) {
+				assert.NotNil(t, err)
+				assert.Contains(t, err.Error(), "invalid character")
+			},
+		},
+		{
+			name: "should_return_error_when_bulk_created_message_is_nil",
+			setupContext: func() context.Context {
+				ctx := context.Background()
+				ctx = context.WithValue(ctx, constants.ContextKeyRequestID, "req-bulk-3")
+				return ctx
+			},
+			setupMessage: func() *nsq.Message {
+				eventVM := vms.EventRequestVM[[]vms.GuestEventRequestVM]{
+					Name:    "guest.bulk.created",
+					Message: nil,
+				}
+				body, _ := json.Marshal(eventVM)
+				return &nsq.Message{Body: body}
+			},
+			setupMock: func(mock *mocks.GuestServiceMock) {},
+			wantErr:   true,
+			validateErr: func(t *testing.T, err error) {
+				assert.NotNil(t, err)
+				assert.Contains(t, err.Error(), "message is nil")
+			},
+		},
+		{
+			name: "should_return_error_when_bulk_created_process_event_fails",
+			setupContext: func() context.Context {
+				ctx := context.Background()
+				ctx = context.WithValue(ctx, constants.ContextKeyRequestID, "req-bulk-4")
+				return ctx
+			},
+			setupMessage: func() *nsq.Message {
+				eventVM := vms.EventRequestVM[[]vms.GuestEventRequestVM]{
+					Name: "guest.bulk.created",
+					Message: &[]vms.GuestEventRequestVM{
+						{
+							ID:        "guest-2",
+							Name:      "Jane Smith",
+							CreatedAt: 1700001000,
+							CreatedBy: "user-2",
+						},
+					},
+				}
+				body, _ := json.Marshal(eventVM)
+				return &nsq.Message{Body: body}
+			},
+			setupMock: func(mockService *mocks.GuestServiceMock) {
+				mockService.On("ProcessEvent", mock.Anything, &dtos.GuestEventRequestDTO{
+					ID:        "guest-2",
+					Name:      "Jane Smith",
+					CreatedAt: 1700001000,
+					CreatedBy: "user-2",
+				}).Return((*dtos.GuestEventResponseDTO)(nil), errors.New("service error"))
+			},
+			wantErr: true,
+			validateErr: func(t *testing.T, err error) {
+				assert.NotNil(t, err)
+				assert.Contains(t, err.Error(), "service error")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockService := mocks.NewGuestServiceMock(t)
+			tt.setupMock(mockService)
+
+			handler := NewGuestHandler(mockService)
+			ctx := tt.setupContext()
+			msg := tt.setupMessage()
+
+			err := handler.HandleBulkCreated(ctx, msg)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				if tt.validateErr != nil {
+					tt.validateErr(t, err)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestGuestHandler_HandleBulkUpdated(t *testing.T) {
+	tests := []struct {
+		name         string
+		setupContext func() context.Context
+		setupMessage func() *nsq.Message
+		setupMock    func(mock *mocks.GuestServiceMock)
+		wantErr      bool
+		validateErr  func(t *testing.T, err error)
+	}{
+		{
+			name: "should_handle_bulk_updated_event_successfully",
+			setupContext: func() context.Context {
+				ctx := context.Background()
+				ctx = context.WithValue(ctx, constants.ContextKeyRequestID, "req-bulk-upd-1")
+				return ctx
+			},
+			setupMessage: func() *nsq.Message {
+				eventVM := vms.EventRequestVM[[]vms.GuestEventRequestVM]{
+					Name: "guest.bulk.updated",
+					Message: &[]vms.GuestEventRequestVM{
+						{
+							ID:        "guest-upd-1",
+							Name:      "Updated Name",
+							UpdatedAt: 1700002000,
+							UpdatedBy: "user-upd",
+						},
+					},
+				}
+				body, _ := json.Marshal(eventVM)
+				return &nsq.Message{Body: body}
+			},
+			setupMock: func(mockService *mocks.GuestServiceMock) {
+				mockService.On("ProcessEvent", mock.Anything, &dtos.GuestEventRequestDTO{
+					ID:        "guest-upd-1",
+					Name:      "Updated Name",
+					UpdatedAt: 1700002000,
+					UpdatedBy: "user-upd",
+				}).Return(&dtos.GuestEventResponseDTO{
+					ID: "guest-upd-1",
+				}, nil)
+			},
+			wantErr: false,
+		},
+		{
+			name: "should_return_error_when_bulk_updated_unmarshal_fails",
+			setupContext: func() context.Context {
+				return context.Background()
+			},
+			setupMessage: func() *nsq.Message {
+				return &nsq.Message{Body: []byte("invalid json")}
+			},
+			setupMock: func(mock *mocks.GuestServiceMock) {},
+			wantErr:   true,
+			validateErr: func(t *testing.T, err error) {
+				assert.NotNil(t, err)
+				assert.Contains(t, err.Error(), "invalid character")
+			},
+		},
+		{
+			name: "should_return_error_when_bulk_updated_message_is_nil",
+			setupContext: func() context.Context {
+				return context.Background()
+			},
+			setupMessage: func() *nsq.Message {
+				eventVM := vms.EventRequestVM[[]vms.GuestEventRequestVM]{
+					Name:    "guest.bulk.updated",
+					Message: nil,
+				}
+				body, _ := json.Marshal(eventVM)
+				return &nsq.Message{Body: body}
+			},
+			setupMock: func(mock *mocks.GuestServiceMock) {},
+			wantErr:   true,
+			validateErr: func(t *testing.T, err error) {
+				assert.NotNil(t, err)
+				assert.Contains(t, err.Error(), "message is nil")
+			},
+		},
+		{
+			name: "should_return_error_when_bulk_updated_process_event_fails",
+			setupContext: func() context.Context {
+				ctx := context.Background()
+				ctx = context.WithValue(ctx, constants.ContextKeyRequestID, "req-bulk-upd-err")
+				return ctx
+			},
+			setupMessage: func() *nsq.Message {
+				eventVM := vms.EventRequestVM[[]vms.GuestEventRequestVM]{
+					Name: "guest.bulk.updated",
+					Message: &[]vms.GuestEventRequestVM{
+						{
+							ID:        "guest-upd-err",
+							Name:      "Error Test",
+							UpdatedAt: 1700005000,
+							UpdatedBy: "user-err",
+						},
+					},
+				}
+				body, _ := json.Marshal(eventVM)
+				return &nsq.Message{Body: body}
+			},
+			setupMock: func(mockService *mocks.GuestServiceMock) {
+				mockService.On("ProcessEvent", mock.Anything, &dtos.GuestEventRequestDTO{
+					ID:        "guest-upd-err",
+					Name:      "Error Test",
+					UpdatedAt: 1700005000,
+					UpdatedBy: "user-err",
+				}).Return((*dtos.GuestEventResponseDTO)(nil), errors.New("service error"))
+			},
+			wantErr: true,
+			validateErr: func(t *testing.T, err error) {
+				assert.NotNil(t, err)
+				assert.Contains(t, err.Error(), "service error")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockService := mocks.NewGuestServiceMock(t)
+			tt.setupMock(mockService)
+
+			handler := NewGuestHandler(mockService)
+			ctx := tt.setupContext()
+			msg := tt.setupMessage()
+
+			err := handler.HandleBulkUpdated(ctx, msg)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				if tt.validateErr != nil {
+					tt.validateErr(t, err)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestGuestHandler_HandleBulkDeleted(t *testing.T) {
+	tests := []struct {
+		name         string
+		setupContext func() context.Context
+		setupMessage func() *nsq.Message
+		setupMock    func(mock *mocks.GuestServiceMock)
+		wantErr      bool
+		validateErr  func(t *testing.T, err error)
+	}{
+		{
+			name: "should_handle_bulk_deleted_event_successfully",
+			setupContext: func() context.Context {
+				ctx := context.Background()
+				ctx = context.WithValue(ctx, constants.ContextKeyRequestID, "req-bulk-del-1")
+				return ctx
+			},
+			setupMessage: func() *nsq.Message {
+				eventVM := vms.EventRequestVM[[]vms.GuestEventRequestVM]{
+					Name: "guest.bulk.deleted",
+					Message: &[]vms.GuestEventRequestVM{
+						{
+							ID:        "guest-del-1",
+							DeletedAt: 1700003000,
+							DeletedBy: "user-del",
+						},
+					},
+				}
+				body, _ := json.Marshal(eventVM)
+				return &nsq.Message{Body: body}
+			},
+			setupMock: func(mockService *mocks.GuestServiceMock) {
+				mockService.On("ProcessEvent", mock.Anything, &dtos.GuestEventRequestDTO{
+					ID:        "guest-del-1",
+					DeletedAt: 1700003000,
+					DeletedBy: "user-del",
+				}).Return(&dtos.GuestEventResponseDTO{
+					ID: "guest-del-1",
+				}, nil)
+			},
+			wantErr: false,
+		},
+		{
+			name: "should_return_error_when_bulk_deleted_unmarshal_fails",
+			setupContext: func() context.Context {
+				return context.Background()
+			},
+			setupMessage: func() *nsq.Message {
+				return &nsq.Message{Body: []byte("invalid json")}
+			},
+			setupMock: func(mock *mocks.GuestServiceMock) {},
+			wantErr:   true,
+			validateErr: func(t *testing.T, err error) {
+				assert.NotNil(t, err)
+				assert.Contains(t, err.Error(), "invalid character")
+			},
+		},
+		{
+			name: "should_return_error_when_bulk_deleted_message_is_nil",
+			setupContext: func() context.Context {
+				return context.Background()
+			},
+			setupMessage: func() *nsq.Message {
+				eventVM := vms.EventRequestVM[[]vms.GuestEventRequestVM]{
+					Name:    "guest.bulk.deleted",
+					Message: nil,
+				}
+				body, _ := json.Marshal(eventVM)
+				return &nsq.Message{Body: body}
+			},
+			setupMock: func(mock *mocks.GuestServiceMock) {},
+			wantErr:   true,
+			validateErr: func(t *testing.T, err error) {
+				assert.NotNil(t, err)
+				assert.Contains(t, err.Error(), "message is nil")
+			},
+		},
+		{
+			name: "should_return_error_when_bulk_deleted_process_event_fails",
+			setupContext: func() context.Context {
+				ctx := context.Background()
+				ctx = context.WithValue(ctx, constants.ContextKeyRequestID, "req-bulk-del-err")
+				return ctx
+			},
+			setupMessage: func() *nsq.Message {
+				eventVM := vms.EventRequestVM[[]vms.GuestEventRequestVM]{
+					Name: "guest.bulk.deleted",
+					Message: &[]vms.GuestEventRequestVM{
+						{
+							ID:        "guest-del-err",
+							DeletedAt: 1700006000,
+							DeletedBy: "user-del-err",
+						},
+					},
+				}
+				body, _ := json.Marshal(eventVM)
+				return &nsq.Message{Body: body}
+			},
+			setupMock: func(mockService *mocks.GuestServiceMock) {
+				mockService.On("ProcessEvent", mock.Anything, &dtos.GuestEventRequestDTO{
+					ID:        "guest-del-err",
+					DeletedAt: 1700006000,
+					DeletedBy: "user-del-err",
+				}).Return((*dtos.GuestEventResponseDTO)(nil), errors.New("service error"))
+			},
+			wantErr: true,
+			validateErr: func(t *testing.T, err error) {
+				assert.NotNil(t, err)
+				assert.Contains(t, err.Error(), "service error")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockService := mocks.NewGuestServiceMock(t)
+			tt.setupMock(mockService)
+
+			handler := NewGuestHandler(mockService)
+			ctx := tt.setupContext()
+			msg := tt.setupMessage()
+
+			err := handler.HandleBulkDeleted(ctx, msg)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				if tt.validateErr != nil {
+					tt.validateErr(t, err)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

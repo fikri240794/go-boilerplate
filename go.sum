@@ -53,8 +53,10 @@ github.com/felixge/httpsnoop v1.0.4 h1:NFTV2Zj1bL4mc9sqWACXbQFVBBg2W3GPvqp8/ESS2
 github.com/felixge/httpsnoop v1.0.4/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
 github.com/fikri240794/gocerr v0.0.5 h1:TEA3xgWq1c5FdWCP8z4X/JDxTwPZsHXQTxsisnLFm2I=
 github.com/fikri240794/gocerr v0.0.5/go.mod h1:rVEZ1F3SasAdM6/lEy4q9tSkGtYiq6telNtbgwHLEmc=
-github.com/fikri240794/goqube v1.0.4 h1:xMJMxfUQfrYO0X3zaGQnV986PbryL4M2h0QuGL5BLEg=
-github.com/fikri240794/goqube v1.0.4/go.mod h1:Q4CeZRqTATa6RIXpnU4D0tN2Jjhkm4vKBWMi0yfA5h4=
+github.com/fikri240794/goqube v1.0.5 h1:aYTe3uNcgCczCE8VIpXZizk4ZtYUUwsxaZZgVP238WA=
+github.com/fikri240794/goqube v1.0.5/go.mod h1:Q4CeZRqTATa6RIXpnU4D0tN2Jjhkm4vKBWMi0yfA5h4=
+github.com/fikri240794/goqube v1.0.7 h1:T8btwOV9uIA0bWYA++47NOdWSZECxoxEcf/h5qHoER8=
+github.com/fikri240794/goqube v1.0.7/go.mod h1:Q4CeZRqTATa6RIXpnU4D0tN2Jjhkm4vKBWMi0yfA5h4=
 github.com/fikri240794/gores v0.0.3 h1:lo9NN2nLKpzhnUSF2AISRqouJeIx5eJut8jmMnZoa5s=
 github.com/fikri240794/gores v0.0.3/go.mod h1:rUoepUuHP2Z5N/Y5s3b5W6uCvHnV7P1C2iuZTcI+YgM=
 github.com/fikri240794/gostacode v0.0.3 h1:3Cnr59/8uDkqrBc4f03AuHQkZ4oBVuXuNTMyGjiqKqE=

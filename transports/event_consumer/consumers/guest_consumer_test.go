@@ -28,6 +28,12 @@ func TestNewGuestConsumer(t *testing.T) {
 				cfg.Guest.Event.Deleted.Topic = "guest-deleted"
 				cfg.Guest.Event.Updated.Enable = true
 				cfg.Guest.Event.Updated.Topic = "guest-updated"
+				cfg.Guest.Event.BulkCreated.Enable = true
+				cfg.Guest.Event.BulkCreated.Topic = "guest-bulk-created"
+				cfg.Guest.Event.BulkUpdated.Enable = true
+				cfg.Guest.Event.BulkUpdated.Topic = "guest-bulk-updated"
+				cfg.Guest.Event.BulkDeleted.Enable = true
+				cfg.Guest.Event.BulkDeleted.Topic = "guest-bulk-deleted"
 				return cfg
 			},
 			setupMock: func(t *testing.T) *mocks.GuestServiceMock {
@@ -39,6 +45,9 @@ func TestNewGuestConsumer(t *testing.T) {
 				assert.NotNil(t, consumer.createdGuestConsumer)
 				assert.NotNil(t, consumer.deletedGuestConsumer)
 				assert.NotNil(t, consumer.updatedGuestConsumer)
+				assert.NotNil(t, consumer.bulkCreatedGuestConsumer)
+				assert.NotNil(t, consumer.bulkUpdatedGuestConsumer)
+				assert.NotNil(t, consumer.bulkDeletedGuestConsumer)
 			},
 			shouldPanic: false,
 		},
@@ -256,6 +265,51 @@ func TestNewGuestConsumer(t *testing.T) {
 			validate:    func(t *testing.T, consumer *GuestConsumer, cfg *configs.Config) {},
 			shouldPanic: true,
 		},
+		{
+			name: "should_panic_when_bulk_created_consumer_initialization_fails",
+			setupCfg: func(t *testing.T) *configs.Config {
+				cfg := &configs.Config{}
+				cfg.Server.Name = ""
+				cfg.Guest.Event.BulkCreated.Enable = true
+				cfg.Guest.Event.BulkCreated.Topic = ""
+				return cfg
+			},
+			setupMock: func(t *testing.T) *mocks.GuestServiceMock {
+				return mocks.NewGuestServiceMock(t)
+			},
+			validate:    func(t *testing.T, consumer *GuestConsumer, cfg *configs.Config) {},
+			shouldPanic: true,
+		},
+		{
+			name: "should_panic_when_bulk_updated_consumer_initialization_fails",
+			setupCfg: func(t *testing.T) *configs.Config {
+				cfg := &configs.Config{}
+				cfg.Server.Name = ""
+				cfg.Guest.Event.BulkUpdated.Enable = true
+				cfg.Guest.Event.BulkUpdated.Topic = ""
+				return cfg
+			},
+			setupMock: func(t *testing.T) *mocks.GuestServiceMock {
+				return mocks.NewGuestServiceMock(t)
+			},
+			validate:    func(t *testing.T, consumer *GuestConsumer, cfg *configs.Config) {},
+			shouldPanic: true,
+		},
+		{
+			name: "should_panic_when_bulk_deleted_consumer_initialization_fails",
+			setupCfg: func(t *testing.T) *configs.Config {
+				cfg := &configs.Config{}
+				cfg.Server.Name = ""
+				cfg.Guest.Event.BulkDeleted.Enable = true
+				cfg.Guest.Event.BulkDeleted.Topic = ""
+				return cfg
+			},
+			setupMock: func(t *testing.T) *mocks.GuestServiceMock {
+				return mocks.NewGuestServiceMock(t)
+			},
+			validate:    func(t *testing.T, consumer *GuestConsumer, cfg *configs.Config) {},
+			shouldPanic: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -382,6 +436,27 @@ func TestGuestConsumer_ConsumeEvents(t *testing.T) {
 				assert.NoError(t, err)
 			},
 		},
+		{
+			name: "should_start_consume_events_with_bulk_consumers_enabled",
+			setupCfg: func(t *testing.T) *configs.Config {
+				cfg := &configs.Config{}
+				cfg.Server.Name = "test-service"
+				cfg.Server.EventConsumer.DataSourceName = "localhost:4161"
+				cfg.Guest.Event.BulkCreated.Enable = true
+				cfg.Guest.Event.BulkCreated.Topic = "guest-bulk-created"
+				cfg.Guest.Event.BulkUpdated.Enable = true
+				cfg.Guest.Event.BulkUpdated.Topic = "guest-bulk-updated"
+				cfg.Guest.Event.BulkDeleted.Enable = true
+				cfg.Guest.Event.BulkDeleted.Topic = "guest-bulk-deleted"
+				return cfg
+			},
+			setupMock: func(t *testing.T) *mocks.GuestServiceMock {
+				return mocks.NewGuestServiceMock(t)
+			},
+			validateErr: func(t *testing.T, err error) {
+				assert.NoError(t, err)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -397,9 +472,7 @@ func TestGuestConsumer_ConsumeEvents(t *testing.T) {
 				tt.validateErr(t, err)
 			}
 
-			if consumer.createdGuestConsumer != nil || consumer.deletedGuestConsumer != nil || consumer.updatedGuestConsumer != nil {
-				consumer.Stop()
-			}
+			consumer.Stop()
 		})
 	}
 }

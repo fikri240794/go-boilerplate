@@ -120,3 +120,81 @@ func (vm *UpdateGuestByIDRequestVM) ToDTO(updatedBy string) *dtos.UpdateGuestByI
 
 	return dto
 }
+
+type BulkCreateGuestsRequestVM struct {
+	Items []CreateGuestRequestVM `json:"items"`
+}
+
+func (vm *BulkCreateGuestsRequestVM) ToDTO(createdBy string) *dtos.BulkCreateGuestsRequestDTO {
+	var dto *dtos.BulkCreateGuestsRequestDTO = &dtos.BulkCreateGuestsRequestDTO{}
+
+	for i := range vm.Items {
+		dto.Items = append(dto.Items, *vm.Items[i].ToDTO(createdBy))
+	}
+
+	return dto
+}
+
+func NewBulkCreateGuestsResponseVM(dto *dtos.BulkCreateGuestsResponseDTO) *[]GuestResponseVM {
+	var vms = make([]GuestResponseVM, 0)
+
+	for i := range dto.Guests {
+		vms = append(vms, *NewGuestResponseVM(&dto.Guests[i]))
+	}
+
+	return &vms
+}
+
+type BulkUpdateGuestItemVM struct {
+	ID      string `json:"id"`
+	Name    string `json:"name" example:"John Snow"`
+	Address string `json:"address,omitempty" example:"123 Main Street, Apt. 4B, New York, NY 10001, USA"`
+}
+
+func (vm *BulkUpdateGuestItemVM) ToDTO(updatedBy string) *dtos.UpdateGuestByIDRequestDTO {
+	var dto *dtos.UpdateGuestByIDRequestDTO = &dtos.UpdateGuestByIDRequestDTO{
+		ID:        vm.ID,
+		Name:      vm.Name,
+		Address:   vm.Address,
+		UpdatedBy: updatedBy,
+	}
+
+	return dto
+}
+
+type BulkUpdateGuestsRequestVM struct {
+	Items []BulkUpdateGuestItemVM `json:"items"`
+}
+
+func (vm *BulkUpdateGuestsRequestVM) ToDTO(updatedBy string) *dtos.BulkUpdateGuestsRequestDTO {
+	var dto *dtos.BulkUpdateGuestsRequestDTO = &dtos.BulkUpdateGuestsRequestDTO{}
+
+	for i := range vm.Items {
+		dto.Items = append(dto.Items, *vm.Items[i].ToDTO(updatedBy))
+	}
+
+	return dto
+}
+
+func NewBulkUpdateGuestsResponseVM(dto *dtos.BulkUpdateGuestsResponseDTO) *[]GuestResponseVM {
+	var vms = make([]GuestResponseVM, 0)
+
+	for i := range dto.Guests {
+		vms = append(vms, *NewGuestResponseVM(&dto.Guests[i]))
+	}
+
+	return &vms
+}
+
+type BulkDeleteGuestsRequestVM struct {
+	IDs []string `json:"ids"`
+}
+
+func (vm *BulkDeleteGuestsRequestVM) ToDTO(deletedBy string) *dtos.BulkDeleteGuestsRequestDTO {
+	var dto *dtos.BulkDeleteGuestsRequestDTO = &dtos.BulkDeleteGuestsRequestDTO{
+		IDs:       vm.IDs,
+		DeletedBy: deletedBy,
+	}
+
+	return dto
+}

@@ -10,10 +10,13 @@ import (
 )
 
 type GuestConsumer struct {
-	cfg                  *configs.Config
-	createdGuestConsumer *nsq.Consumer
-	deletedGuestConsumer *nsq.Consumer
-	updatedGuestConsumer *nsq.Consumer
+	cfg                      *configs.Config
+	createdGuestConsumer     *nsq.Consumer
+	deletedGuestConsumer     *nsq.Consumer
+	updatedGuestConsumer     *nsq.Consumer
+	bulkCreatedGuestConsumer *nsq.Consumer
+	bulkUpdatedGuestConsumer *nsq.Consumer
+	bulkDeletedGuestConsumer *nsq.Consumer
 }
 
 func NewGuestConsumer(cfg *configs.Config, handler *handlers.GuestHandler) *GuestConsumer {
@@ -67,12 +70,74 @@ func NewGuestConsumer(cfg *configs.Config, handler *handlers.GuestHandler) *Gues
 		consumer.updatedGuestConsumer.AddHandler(handlers.NewMessageHandler(handler.HandleUpdated))
 	}
 
+	if cfg.Guest.Event.BulkCreated.Enable {
+		consumer.bulkCreatedGuestConsumer, err = nsq.NewConsumer(
+			cfg.Guest.Event.BulkCreated.Topic,
+			cfg.Server.Name,
+			nsqConfig,
+		)
+		if err != nil {
+			panic(err)
+		}
+
+		consumer.bulkCreatedGuestConsumer.AddHandler(handlers.NewMessageHandler(handler.HandleBulkCreated))
+	}
+
+	if cfg.Guest.Event.BulkUpdated.Enable {
+		consumer.bulkUpdatedGuestConsumer, err = nsq.NewConsumer(
+			cfg.Guest.Event.BulkUpdated.Topic,
+			cfg.Server.Name,
+			nsqConfig,
+		)
+		if err != nil {
+			panic(err)
+		}
+
+		consumer.bulkUpdatedGuestConsumer.AddHandler(handlers.NewMessageHandler(handler.HandleBulkUpdated))
+	}
+
+	if cfg.Guest.Event.BulkDeleted.Enable {
+		consumer.bulkDeletedGuestConsumer, err = nsq.NewConsumer(
+			cfg.Guest.Event.BulkDeleted.Topic,
+			cfg.Server.Name,
+			nsqConfig,
+		)
+		if err != nil {
+			panic(err)
+		}
+
+		consumer.bulkDeletedGuestConsumer.AddHandler(handlers.NewMessageHandler(handler.HandleBulkDeleted))
+	}
+
 	return consumer
 }
 
 func (c *GuestConsumer) ConsumeEvents() error {
-	var errTask gotask.ErrorTask
-	errTask, _ = gotask.NewErrorTask(context.Background(), 3)
+	var (
+		taskCount int
+		errTask   gotask.ErrorTask
+	)
+
+	if c.createdGuestConsumer != nil {
+		taskCount++
+	}
+	if c.deletedGuestConsumer != nil {
+		taskCount++
+	}
+	if c.updatedGuestConsumer != nil {
+		taskCount++
+	}
+	if c.bulkCreatedGuestConsumer != nil {
+		taskCount++
+	}
+	if c.bulkUpdatedGuestConsumer != nil {
+		taskCount++
+	}
+	if c.bulkDeletedGuestConsumer != nil {
+		taskCount++
+	}
+
+	errTask, _ = gotask.NewErrorTask(context.Background(), taskCount)
 
 	if c.createdGuestConsumer != nil {
 		errTask.Go(func() error {
@@ -92,22 +157,71 @@ func (c *GuestConsumer) ConsumeEvents() error {
 		})
 	}
 
+	if c.bulkCreatedGuestConsumer != nil {
+		errTask.Go(func() error {
+			return c.bulkCreatedGuestConsumer.ConnectToNSQLookupd(c.cfg.Server.EventConsumer.DataSourceName)
+		})
+	}
+
+	if c.bulkUpdatedGuestConsumer != nil {
+		errTask.Go(func() error {
+			return c.bulkUpdatedGuestConsumer.ConnectToNSQLookupd(c.cfg.Server.EventConsumer.DataSourceName)
+		})
+	}
+
+	if c.bulkDeletedGuestConsumer != nil {
+		errTask.Go(func() error {
+			return c.bulkDeletedGuestConsumer.ConnectToNSQLookupd(c.cfg.Server.EventConsumer.DataSourceName)
+		})
+	}
+
 	return errTask.Wait()
 }
 
 func (c *GuestConsumer) Stop() {
-	var task gotask.Task = gotask.NewTask(3)
+	var (
+		taskCount int
+		task      gotask.Task
+	)
+
+	if c.createdGuestConsumer != nil {
+		taskCount++
+	}
+	if c.deletedGuestConsumer != nil {
+		taskCount++
+	}
+	if c.updatedGuestConsumer != nil {
+		taskCount++
+	}
+	if c.bulkCreatedGuestConsumer != nil {
+		taskCount++
+	}
+	if c.bulkUpdatedGuestConsumer != nil {
+		taskCount++
+	}
+	if c.bulkDeletedGuestConsumer != nil {
+		taskCount++
+	}
+
+	task = gotask.NewTask(taskCount)
 
 	if c.createdGuestConsumer != nil {
 		task.Go(c.createdGuestConsumer.Stop)
 	}
-
 	if c.deletedGuestConsumer != nil {
 		task.Go(c.deletedGuestConsumer.Stop)
 	}
-
 	if c.updatedGuestConsumer != nil {
 		task.Go(c.updatedGuestConsumer.Stop)
+	}
+	if c.bulkCreatedGuestConsumer != nil {
+		task.Go(c.bulkCreatedGuestConsumer.Stop)
+	}
+	if c.bulkUpdatedGuestConsumer != nil {
+		task.Go(c.bulkUpdatedGuestConsumer.Stop)
+	}
+	if c.bulkDeletedGuestConsumer != nil {
+		task.Go(c.bulkDeletedGuestConsumer.Stop)
 	}
 
 	task.Wait()

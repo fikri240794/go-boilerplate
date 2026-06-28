@@ -962,3 +962,321 @@ func Test_UpdateGuestByIDRequestVM_ToDTO(t *testing.T) {
 		})
 	}
 }
+
+// Bulk HTTP VM tests
+
+func validUUIDStr() string {
+	return "01932293-d710-7f55-a9f6-66e6248ae72f"
+}
+
+func Test_BulkCreateGuestsRequestVM_ToDTO(t *testing.T) {
+	type fields struct {
+		Items []CreateGuestRequestVM
+	}
+	type args struct {
+		createdBy string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *dtos.BulkCreateGuestsRequestDTO
+	}{
+		{
+			name: "success - convert single item VM to DTO",
+			fields: fields{
+				Items: []CreateGuestRequestVM{
+					{Name: "John Snow", Address: "123 Main St"},
+				},
+			},
+			args: args{createdBy: "admin"},
+			want: &dtos.BulkCreateGuestsRequestDTO{
+				Items: []dtos.CreateGuestRequestDTO{
+					{Name: "John Snow", Address: "123 Main St", CreatedBy: "admin"},
+				},
+			},
+		},
+		{
+			name: "success - convert multiple items VM to DTO",
+			fields: fields{
+				Items: []CreateGuestRequestVM{
+					{Name: "John Snow", Address: "123 Main St"},
+					{Name: "Jane Smith"},
+				},
+			},
+			args: args{createdBy: "system"},
+			want: &dtos.BulkCreateGuestsRequestDTO{
+				Items: []dtos.CreateGuestRequestDTO{
+					{Name: "John Snow", Address: "123 Main St", CreatedBy: "system"},
+					{Name: "Jane Smith", CreatedBy: "system"},
+				},
+			},
+		},
+		{
+			name: "success - convert empty items VM to DTO",
+			fields: fields{
+				Items: []CreateGuestRequestVM{},
+			},
+			args: args{createdBy: "admin"},
+			want: &dtos.BulkCreateGuestsRequestDTO{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vm := &BulkCreateGuestsRequestVM{
+				Items: tt.fields.Items,
+			}
+			got := vm.ToDTO(tt.args.createdBy)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func Test_NewBulkCreateGuestsResponseVM(t *testing.T) {
+	type args struct {
+		dto *dtos.BulkCreateGuestsResponseDTO
+	}
+	tests := []struct {
+		name string
+		args args
+		want *[]GuestResponseVM
+	}{
+		{
+			name: "success - create response VM with guests",
+			args: args{
+				dto: &dtos.BulkCreateGuestsResponseDTO{
+					Guests: []dtos.GuestResponseDTO{
+						{ID: "id-1", Name: "John", CreatedBy: "admin"},
+						{ID: "id-2", Name: "Jane", CreatedBy: "system"},
+					},
+				},
+			},
+			want: &[]GuestResponseVM{
+				{ID: "id-1", Name: "John", CreatedBy: "admin"},
+				{ID: "id-2", Name: "Jane", CreatedBy: "system"},
+			},
+		},
+		{
+			name: "success - create response VM with empty guests",
+			args: args{
+				dto: &dtos.BulkCreateGuestsResponseDTO{
+					Guests: []dtos.GuestResponseDTO{},
+				},
+			},
+			want: &[]GuestResponseVM{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := NewBulkCreateGuestsResponseVM(tt.args.dto)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func Test_BulkUpdateGuestItemVM_ToDTO(t *testing.T) {
+	type fields struct {
+		ID      string
+		Name    string
+		Address string
+	}
+	type args struct {
+		updatedBy string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *dtos.UpdateGuestByIDRequestDTO
+	}{
+		{
+			name: "success - convert VM to DTO with all fields",
+			fields: fields{
+				ID:      "id-1",
+				Name:    "Updated Name",
+				Address: "123 Main St",
+			},
+			args: args{updatedBy: "admin"},
+			want: &dtos.UpdateGuestByIDRequestDTO{
+				ID:        "id-1",
+				Name:      "Updated Name",
+				Address:   "123 Main St",
+				UpdatedBy: "admin",
+			},
+		},
+		{
+			name: "success - convert VM to DTO without address",
+			fields: fields{
+				ID:   "id-2",
+				Name: "Name Only",
+			},
+			args: args{updatedBy: "system"},
+			want: &dtos.UpdateGuestByIDRequestDTO{
+				ID:        "id-2",
+				Name:      "Name Only",
+				UpdatedBy: "system",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vm := &BulkUpdateGuestItemVM{
+				ID:      tt.fields.ID,
+				Name:    tt.fields.Name,
+				Address: tt.fields.Address,
+			}
+			got := vm.ToDTO(tt.args.updatedBy)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func Test_BulkUpdateGuestsRequestVM_ToDTO(t *testing.T) {
+	type fields struct {
+		Items []BulkUpdateGuestItemVM
+	}
+	type args struct {
+		updatedBy string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *dtos.BulkUpdateGuestsRequestDTO
+	}{
+		{
+			name: "success - convert single item VM to DTO",
+			fields: fields{
+				Items: []BulkUpdateGuestItemVM{
+					{ID: "id-1", Name: "Updated Name", Address: "123 Main St"},
+				},
+			},
+			args: args{updatedBy: "admin"},
+			want: &dtos.BulkUpdateGuestsRequestDTO{
+				Items: []dtos.UpdateGuestByIDRequestDTO{
+					{ID: "id-1", Name: "Updated Name", Address: "123 Main St", UpdatedBy: "admin"},
+				},
+			},
+		},
+		{
+			name: "success - convert multiple items VM to DTO",
+			fields: fields{
+				Items: []BulkUpdateGuestItemVM{
+					{ID: "id-1", Name: "Name 1"},
+					{ID: "id-2", Name: "Name 2"},
+				},
+			},
+			args: args{updatedBy: "system"},
+			want: &dtos.BulkUpdateGuestsRequestDTO{
+				Items: []dtos.UpdateGuestByIDRequestDTO{
+					{ID: "id-1", Name: "Name 1", UpdatedBy: "system"},
+					{ID: "id-2", Name: "Name 2", UpdatedBy: "system"},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vm := &BulkUpdateGuestsRequestVM{
+				Items: tt.fields.Items,
+			}
+			got := vm.ToDTO(tt.args.updatedBy)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func Test_NewBulkUpdateGuestsResponseVM(t *testing.T) {
+	type args struct {
+		dto *dtos.BulkUpdateGuestsResponseDTO
+	}
+	tests := []struct {
+		name string
+		args args
+		want *[]GuestResponseVM
+	}{
+		{
+			name: "success - create response VM with guests",
+			args: args{
+				dto: &dtos.BulkUpdateGuestsResponseDTO{
+					Guests: []dtos.GuestResponseDTO{
+						{ID: "id-1", Name: "Updated John", CreatedBy: "admin"},
+					},
+				},
+			},
+			want: &[]GuestResponseVM{
+				{ID: "id-1", Name: "Updated John", CreatedBy: "admin"},
+			},
+		},
+		{
+			name: "success - create response VM with empty guests",
+			args: args{
+				dto: &dtos.BulkUpdateGuestsResponseDTO{
+					Guests: []dtos.GuestResponseDTO{},
+				},
+			},
+			want: &[]GuestResponseVM{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := NewBulkUpdateGuestsResponseVM(tt.args.dto)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func Test_BulkDeleteGuestsRequestVM_ToDTO(t *testing.T) {
+	type fields struct {
+		IDs []string
+	}
+	tests := []struct {
+		name      string
+		fields    fields
+		deletedBy string
+		want      *dtos.BulkDeleteGuestsRequestDTO
+	}{
+		{
+			name: "success - convert VM to DTO with multiple IDs",
+			fields: fields{
+				IDs: []string{"id-1", "id-2"},
+			},
+			deletedBy: "admin",
+			want: &dtos.BulkDeleteGuestsRequestDTO{
+				IDs:       []string{"id-1", "id-2"},
+				DeletedBy: "admin",
+			},
+		},
+		{
+			name: "success - convert VM to DTO with single ID",
+			fields: fields{
+				IDs: []string{"id-1"},
+			},
+			deletedBy: "system",
+			want: &dtos.BulkDeleteGuestsRequestDTO{
+				IDs:       []string{"id-1"},
+				DeletedBy: "system",
+			},
+		},
+		{
+			name: "success - convert VM to DTO with empty IDs",
+			fields: fields{
+				IDs: []string{},
+			},
+			deletedBy: "admin",
+			want: &dtos.BulkDeleteGuestsRequestDTO{
+				IDs:       []string{},
+				DeletedBy: "admin",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vm := &BulkDeleteGuestsRequestVM{
+				IDs: tt.fields.IDs,
+			}
+			got := vm.ToDTO(tt.deletedBy)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

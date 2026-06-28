@@ -5,7 +5,7 @@ go 1.25
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/fikri240794/gocerr v0.0.5
-	github.com/fikri240794/goqube v1.0.4
+	github.com/fikri240794/goqube v1.0.7
 	github.com/fikri240794/gores v0.0.3
 	github.com/fikri240794/gostacode v0.0.3
 	github.com/fikri240794/gotask v0.0.4

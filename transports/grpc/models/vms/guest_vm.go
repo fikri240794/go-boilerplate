@@ -87,3 +87,52 @@ func UpdateGuestByIDRequestVMToDTO(vm *protobuf_boilerplate.UpdateGuestByIDReque
 
 	return dto
 }
+
+func BulkCreateGuestsRequestVMToDTO(vm *protobuf_boilerplate.BulkCreateGuestsRequestVM, createdBy string) *dtos.BulkCreateGuestsRequestDTO {
+	var dto *dtos.BulkCreateGuestsRequestDTO = &dtos.BulkCreateGuestsRequestDTO{}
+
+	for _, item := range vm.GetItems() {
+		dto.Items = append(dto.Items, *CreateGuestRequestVMToDTO(item, createdBy))
+	}
+
+	return dto
+}
+
+func NewBulkCreateGuestsResponseVM(dto *dtos.BulkCreateGuestsResponseDTO) *protobuf_boilerplate.BulkCreateGuestsResponseVM {
+	var vm *protobuf_boilerplate.BulkCreateGuestsResponseVM = &protobuf_boilerplate.BulkCreateGuestsResponseVM{}
+
+	for i := range dto.Guests {
+		vm.Data = append(vm.Data, NewGuestResponseVM(&dto.Guests[i]))
+	}
+
+	return vm
+}
+
+func BulkUpdateGuestsRequestVMToDTO(vm *protobuf_boilerplate.BulkUpdateGuestsRequestVM, updatedBy string) *dtos.BulkUpdateGuestsRequestDTO {
+	var dto *dtos.BulkUpdateGuestsRequestDTO = &dtos.BulkUpdateGuestsRequestDTO{}
+
+	for _, item := range vm.GetItems() {
+		dto.Items = append(dto.Items, *UpdateGuestByIDRequestVMToDTO(item, updatedBy))
+	}
+
+	return dto
+}
+
+func NewBulkUpdateGuestsResponseVM(dto *dtos.BulkUpdateGuestsResponseDTO) *protobuf_boilerplate.BulkUpdateGuestsResponseVM {
+	var vm *protobuf_boilerplate.BulkUpdateGuestsResponseVM = &protobuf_boilerplate.BulkUpdateGuestsResponseVM{}
+
+	for i := range dto.Guests {
+		vm.Data = append(vm.Data, NewGuestResponseVM(&dto.Guests[i]))
+	}
+
+	return vm
+}
+
+func BulkDeleteGuestsRequestVMToDTO(vm *protobuf_boilerplate.BulkDeleteGuestsRequestVM, deletedBy string) *dtos.BulkDeleteGuestsRequestDTO {
+	var dto *dtos.BulkDeleteGuestsRequestDTO = &dtos.BulkDeleteGuestsRequestDTO{
+		IDs:       vm.GetIds(),
+		DeletedBy: deletedBy,
+	}
+
+	return dto
+}

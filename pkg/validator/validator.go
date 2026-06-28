@@ -19,7 +19,9 @@ var (
 )
 
 func fieldFromJSONTag(fld reflect.StructField) string {
-	name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
+	var name string
+
+	name = strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
 
 	if name == "-" {
 		return ""

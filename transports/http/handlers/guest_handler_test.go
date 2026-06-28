@@ -110,6 +110,26 @@ func TestGuestHandler_SetupRoutes(t *testing.T) {
 				assert.True(t, hasGetGuests, "Expected GET /guests route to be registered")
 				assert.True(t, hasGetGuestsWithID, "Expected GET /guests/:id route to be registered")
 				assert.True(t, hasPutGuestsWithID, "Expected PUT /guests/:id route to be registered")
+
+				hasPostGuestsBulk := false
+				hasPutGuestsBulk := false
+				hasDeleteGuestsBulk := false
+
+				for key := range routeMap {
+					if key == "POST /guests/bulk" || key == "POST /guests/bulk/" {
+						hasPostGuestsBulk = true
+					}
+					if key == "PUT /guests/bulk" || key == "PUT /guests/bulk/" {
+						hasPutGuestsBulk = true
+					}
+					if key == "DELETE /guests/bulk" || key == "DELETE /guests/bulk/" {
+						hasDeleteGuestsBulk = true
+					}
+				}
+
+				assert.True(t, hasPostGuestsBulk, "Expected POST /guests/bulk route to be registered")
+				assert.True(t, hasPutGuestsBulk, "Expected PUT /guests/bulk route to be registered")
+				assert.True(t, hasDeleteGuestsBulk, "Expected DELETE /guests/bulk route to be registered")
 			},
 		},
 		{
@@ -127,7 +147,7 @@ func TestGuestHandler_SetupRoutes(t *testing.T) {
 					}
 				}
 
-				assert.GreaterOrEqual(t, len(guestRoutes), 5, "Expected at least 5 guest routes to be registered")
+				assert.GreaterOrEqual(t, len(guestRoutes), 8, "Expected at least 8 guest routes to be registered")
 			},
 		},
 	}
@@ -1256,6 +1276,446 @@ func TestGuestHandler_UpdateByID(t *testing.T) {
 			app := fiber.New()
 
 			app.Put("/guests/:id", handler.UpdateByID)
+
+			req := tt.setupRequest(t)
+			resp, err := app.Test(req, -1)
+			assert.NoError(t, err)
+			defer resp.Body.Close()
+
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+
+			if tt.validate != nil {
+				var mockService *mocks.GuestServiceMock
+				if handler.guestService != nil {
+					mockService = handler.guestService.(*mocks.GuestServiceMock)
+				}
+				tt.validate(t, resp, mockService)
+			}
+		})
+	}
+}
+
+func TestGuestHandler_BulkCreate(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupHandler   func(t *testing.T) *GuestHandler
+		setupRequest   func(t *testing.T) *http.Request
+		expectedStatus int
+		validate       func(t *testing.T, resp *http.Response, mockService *mocks.GuestServiceMock)
+	}{
+		{
+			name: "should bulk create guests successfully",
+			setupHandler: func(t *testing.T) *GuestHandler {
+				mockService := mocks.NewGuestServiceMock(t)
+				mockService.On("BulkCreate", mock.Anything, mock.AnythingOfType("*dtos.BulkCreateGuestsRequestDTO")).
+					Return(&dtos.BulkCreateGuestsResponseDTO{
+						Guests: []dtos.GuestResponseDTO{
+							{ID: "01932293-d710-7f55-a9f6-66e6248ae72f", Name: "John Snow", Address: "123 Main St", CreatedAt: 1731452061534, CreatedBy: "00000000-0000-0000-0000-000000000000"},
+						},
+					}, nil)
+				return NewGuestHandler(mockService)
+			},
+			setupRequest: func(t *testing.T) *http.Request {
+				body := map[string]interface{}{
+					"items": []map[string]interface{}{
+						{"name": "John Snow", "address": "123 Main St"},
+					},
+				}
+				bodyBytes, _ := json.Marshal(body)
+				req := httptest.NewRequest(http.MethodPost, "/guests/bulk", bytes.NewReader(bodyBytes))
+				req.Header.Set("Content-Type", "application/json")
+				ctx := context.WithValue(req.Context(), constants.ContextKeyRequestID, "test-request-id")
+				return req.WithContext(ctx)
+			},
+			expectedStatus: fiber.StatusCreated,
+			validate: func(t *testing.T, resp *http.Response, mockService *mocks.GuestServiceMock) {
+				assert.Equal(t, fiber.StatusCreated, resp.StatusCode)
+				bodyBytes, _ := io.ReadAll(resp.Body)
+				var response map[string]interface{}
+				json.Unmarshal(bodyBytes, &response)
+				assert.Equal(t, float64(fiber.StatusCreated), response["code"])
+				assert.NotNil(t, response["data"])
+			},
+		},
+		{
+			name: "should return error when body parser fails",
+			setupHandler: func(t *testing.T) *GuestHandler {
+				mockService := mocks.NewGuestServiceMock(t)
+				return NewGuestHandler(mockService)
+			},
+			setupRequest: func(t *testing.T) *http.Request {
+				req := httptest.NewRequest(http.MethodPost, "/guests/bulk", bytes.NewReader([]byte("invalid json")))
+				req.Header.Set("Content-Type", "application/json")
+				ctx := context.WithValue(req.Context(), constants.ContextKeyRequestID, "test-request-id")
+				return req.WithContext(ctx)
+			},
+			expectedStatus: fiber.StatusBadRequest,
+			validate: func(t *testing.T, resp *http.Response, mockService *mocks.GuestServiceMock) {
+				assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
+				bodyBytes, _ := io.ReadAll(resp.Body)
+				var response map[string]interface{}
+				json.Unmarshal(bodyBytes, &response)
+				assert.Equal(t, float64(fiber.StatusBadRequest), response["code"])
+				assert.NotNil(t, response["error"])
+			},
+		},
+		{
+			name: "should return error when service returns bad request error",
+			setupHandler: func(t *testing.T) *GuestHandler {
+				mockService := mocks.NewGuestServiceMock(t)
+				mockService.On("BulkCreate", mock.Anything, mock.AnythingOfType("*dtos.BulkCreateGuestsRequestDTO")).
+					Return((*dtos.BulkCreateGuestsResponseDTO)(nil), errors.New("validation error"))
+				return NewGuestHandler(mockService)
+			},
+			setupRequest: func(t *testing.T) *http.Request {
+				body := map[string]interface{}{
+					"items": []map[string]interface{}{
+						{"name": "John Snow"},
+					},
+				}
+				bodyBytes, _ := json.Marshal(body)
+				req := httptest.NewRequest(http.MethodPost, "/guests/bulk", bytes.NewReader(bodyBytes))
+				req.Header.Set("Content-Type", "application/json")
+				ctx := context.WithValue(req.Context(), constants.ContextKeyRequestID, "test-request-id")
+				return req.WithContext(ctx)
+			},
+			expectedStatus: fiber.StatusInternalServerError,
+			validate: func(t *testing.T, resp *http.Response, mockService *mocks.GuestServiceMock) {
+				bodyBytes, _ := io.ReadAll(resp.Body)
+				var response map[string]interface{}
+				json.Unmarshal(bodyBytes, &response)
+				assert.NotNil(t, response["error"])
+			},
+		},
+		{
+			name: "should return internal server error when service fails with error code >= 500",
+			setupHandler: func(t *testing.T) *GuestHandler {
+				mockService := mocks.NewGuestServiceMock(t)
+				mockService.On("BulkCreate", mock.Anything, mock.AnythingOfType("*dtos.BulkCreateGuestsRequestDTO")).
+					Return((*dtos.BulkCreateGuestsResponseDTO)(nil), gocerr.New(fiber.StatusInternalServerError, "internal error"))
+				return NewGuestHandler(mockService)
+			},
+			setupRequest: func(t *testing.T) *http.Request {
+				body := map[string]interface{}{
+					"items": []map[string]interface{}{
+						{"name": "John Snow"},
+					},
+				}
+				bodyBytes, _ := json.Marshal(body)
+				req := httptest.NewRequest(http.MethodPost, "/guests/bulk", bytes.NewReader(bodyBytes))
+				req.Header.Set("Content-Type", "application/json")
+				ctx := context.WithValue(req.Context(), constants.ContextKeyRequestID, "test-request-id")
+				return req.WithContext(ctx)
+			},
+			expectedStatus: fiber.StatusInternalServerError,
+			validate: func(t *testing.T, resp *http.Response, mockService *mocks.GuestServiceMock) {
+				assert.Equal(t, fiber.StatusInternalServerError, resp.StatusCode)
+				bodyBytes, _ := io.ReadAll(resp.Body)
+				var response map[string]interface{}
+				json.Unmarshal(bodyBytes, &response)
+				assert.Equal(t, float64(fiber.StatusInternalServerError), response["code"])
+				assert.NotNil(t, response["error"])
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := tt.setupHandler(t)
+			app := fiber.New()
+
+			app.Post("/guests/bulk", handler.BulkCreate)
+
+			req := tt.setupRequest(t)
+			resp, err := app.Test(req, -1)
+			assert.NoError(t, err)
+			defer resp.Body.Close()
+
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+
+			if tt.validate != nil {
+				var mockService *mocks.GuestServiceMock
+				if handler.guestService != nil {
+					mockService = handler.guestService.(*mocks.GuestServiceMock)
+				}
+				tt.validate(t, resp, mockService)
+			}
+		})
+	}
+}
+
+func TestGuestHandler_BulkUpdate(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupHandler   func(t *testing.T) *GuestHandler
+		setupRequest   func(t *testing.T) *http.Request
+		expectedStatus int
+		validate       func(t *testing.T, resp *http.Response, mockService *mocks.GuestServiceMock)
+	}{
+		{
+			name: "should bulk update guests successfully",
+			setupHandler: func(t *testing.T) *GuestHandler {
+				mockService := mocks.NewGuestServiceMock(t)
+				mockService.On("BulkUpdate", mock.Anything, mock.AnythingOfType("*dtos.BulkUpdateGuestsRequestDTO")).
+					Return(&dtos.BulkUpdateGuestsResponseDTO{
+						Guests: []dtos.GuestResponseDTO{
+							{ID: "01932293-d710-7f55-a9f6-66e6248ae72f", Name: "Updated Name", Address: "456 Oak Ave", CreatedAt: 1731452061534, CreatedBy: "admin", UpdatedAt: 1731452061535, UpdatedBy: "admin"},
+						},
+					}, nil)
+				return NewGuestHandler(mockService)
+			},
+			setupRequest: func(t *testing.T) *http.Request {
+				body := map[string]interface{}{
+					"items": []map[string]interface{}{
+						{"id": "01932293-d710-7f55-a9f6-66e6248ae72f", "name": "Updated Name", "address": "456 Oak Ave", "updated_by": "admin"},
+					},
+				}
+				bodyBytes, _ := json.Marshal(body)
+				req := httptest.NewRequest(http.MethodPut, "/guests/bulk", bytes.NewReader(bodyBytes))
+				req.Header.Set("Content-Type", "application/json")
+				ctx := context.WithValue(req.Context(), constants.ContextKeyRequestID, "test-request-id")
+				return req.WithContext(ctx)
+			},
+			expectedStatus: fiber.StatusOK,
+			validate: func(t *testing.T, resp *http.Response, mockService *mocks.GuestServiceMock) {
+				assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+				bodyBytes, _ := io.ReadAll(resp.Body)
+				var response map[string]interface{}
+				json.Unmarshal(bodyBytes, &response)
+				assert.Equal(t, float64(fiber.StatusOK), response["code"])
+				assert.NotNil(t, response["data"])
+			},
+		},
+		{
+			name: "should return error when body parser fails",
+			setupHandler: func(t *testing.T) *GuestHandler {
+				mockService := mocks.NewGuestServiceMock(t)
+				return NewGuestHandler(mockService)
+			},
+			setupRequest: func(t *testing.T) *http.Request {
+				req := httptest.NewRequest(http.MethodPut, "/guests/bulk", bytes.NewReader([]byte("invalid json")))
+				req.Header.Set("Content-Type", "application/json")
+				ctx := context.WithValue(req.Context(), constants.ContextKeyRequestID, "test-request-id")
+				return req.WithContext(ctx)
+			},
+			expectedStatus: fiber.StatusBadRequest,
+			validate: func(t *testing.T, resp *http.Response, mockService *mocks.GuestServiceMock) {
+				assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
+				bodyBytes, _ := io.ReadAll(resp.Body)
+				var response map[string]interface{}
+				json.Unmarshal(bodyBytes, &response)
+				assert.Equal(t, float64(fiber.StatusBadRequest), response["code"])
+				assert.NotNil(t, response["error"])
+			},
+		},
+		{
+			name: "should return error when service returns error",
+			setupHandler: func(t *testing.T) *GuestHandler {
+				mockService := mocks.NewGuestServiceMock(t)
+				mockService.On("BulkUpdate", mock.Anything, mock.AnythingOfType("*dtos.BulkUpdateGuestsRequestDTO")).
+					Return((*dtos.BulkUpdateGuestsResponseDTO)(nil), errors.New("bulk update error"))
+				return NewGuestHandler(mockService)
+			},
+			setupRequest: func(t *testing.T) *http.Request {
+				body := map[string]interface{}{
+					"items": []map[string]interface{}{
+						{"id": "01932293-d710-7f55-a9f6-66e6248ae72f", "name": "Updated", "updated_by": "admin"},
+					},
+				}
+				bodyBytes, _ := json.Marshal(body)
+				req := httptest.NewRequest(http.MethodPut, "/guests/bulk", bytes.NewReader(bodyBytes))
+				req.Header.Set("Content-Type", "application/json")
+				ctx := context.WithValue(req.Context(), constants.ContextKeyRequestID, "test-request-id")
+				return req.WithContext(ctx)
+			},
+			expectedStatus: fiber.StatusInternalServerError,
+			validate: func(t *testing.T, resp *http.Response, mockService *mocks.GuestServiceMock) {
+				bodyBytes, _ := io.ReadAll(resp.Body)
+				var response map[string]interface{}
+				json.Unmarshal(bodyBytes, &response)
+				assert.NotNil(t, response["error"])
+			},
+		},
+		{
+			name: "should return error when service fails with error code >= 500",
+			setupHandler: func(t *testing.T) *GuestHandler {
+				mockService := mocks.NewGuestServiceMock(t)
+				mockService.On("BulkUpdate", mock.Anything, mock.AnythingOfType("*dtos.BulkUpdateGuestsRequestDTO")).
+					Return((*dtos.BulkUpdateGuestsResponseDTO)(nil), gocerr.New(fiber.StatusInternalServerError, "internal error"))
+				return NewGuestHandler(mockService)
+			},
+			setupRequest: func(t *testing.T) *http.Request {
+				body := map[string]interface{}{
+					"items": []map[string]interface{}{
+						{"id": "01932293-d710-7f55-a9f6-66e6248ae72f", "name": "Updated", "updated_by": "admin"},
+					},
+				}
+				bodyBytes, _ := json.Marshal(body)
+				req := httptest.NewRequest(http.MethodPut, "/guests/bulk", bytes.NewReader(bodyBytes))
+				req.Header.Set("Content-Type", "application/json")
+				ctx := context.WithValue(req.Context(), constants.ContextKeyRequestID, "test-request-id")
+				return req.WithContext(ctx)
+			},
+			expectedStatus: fiber.StatusInternalServerError,
+			validate: func(t *testing.T, resp *http.Response, mockService *mocks.GuestServiceMock) {
+				assert.Equal(t, fiber.StatusInternalServerError, resp.StatusCode)
+				bodyBytes, _ := io.ReadAll(resp.Body)
+				var response map[string]interface{}
+				json.Unmarshal(bodyBytes, &response)
+				assert.Equal(t, float64(fiber.StatusInternalServerError), response["code"])
+				assert.NotNil(t, response["error"])
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := tt.setupHandler(t)
+			app := fiber.New()
+
+			app.Put("/guests/bulk", handler.BulkUpdate)
+
+			req := tt.setupRequest(t)
+			resp, err := app.Test(req, -1)
+			assert.NoError(t, err)
+			defer resp.Body.Close()
+
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+
+			if tt.validate != nil {
+				var mockService *mocks.GuestServiceMock
+				if handler.guestService != nil {
+					mockService = handler.guestService.(*mocks.GuestServiceMock)
+				}
+				tt.validate(t, resp, mockService)
+			}
+		})
+	}
+}
+
+func TestGuestHandler_BulkDelete(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupHandler   func(t *testing.T) *GuestHandler
+		setupRequest   func(t *testing.T) *http.Request
+		expectedStatus int
+		validate       func(t *testing.T, resp *http.Response, mockService *mocks.GuestServiceMock)
+	}{
+		{
+			name: "should bulk delete guests successfully",
+			setupHandler: func(t *testing.T) *GuestHandler {
+				mockService := mocks.NewGuestServiceMock(t)
+				mockService.On("BulkDelete", mock.Anything, mock.AnythingOfType("*dtos.BulkDeleteGuestsRequestDTO")).
+					Return(nil)
+				return NewGuestHandler(mockService)
+			},
+			setupRequest: func(t *testing.T) *http.Request {
+				body := map[string]interface{}{
+					"ids":        []string{"01932293-d710-7f55-a9f6-66e6248ae72f"},
+					"deleted_by": "admin",
+				}
+				bodyBytes, _ := json.Marshal(body)
+				req := httptest.NewRequest(http.MethodDelete, "/guests/bulk", bytes.NewReader(bodyBytes))
+				req.Header.Set("Content-Type", "application/json")
+				ctx := context.WithValue(req.Context(), constants.ContextKeyRequestID, "test-request-id")
+				return req.WithContext(ctx)
+			},
+			expectedStatus: fiber.StatusOK,
+			validate: func(t *testing.T, resp *http.Response, mockService *mocks.GuestServiceMock) {
+				assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+				bodyBytes, _ := io.ReadAll(resp.Body)
+				var response map[string]interface{}
+				json.Unmarshal(bodyBytes, &response)
+				assert.Equal(t, float64(fiber.StatusOK), response["code"])
+				assert.True(t, response["data"].(bool))
+			},
+		},
+		{
+			name: "should return error when body parser fails",
+			setupHandler: func(t *testing.T) *GuestHandler {
+				mockService := mocks.NewGuestServiceMock(t)
+				return NewGuestHandler(mockService)
+			},
+			setupRequest: func(t *testing.T) *http.Request {
+				req := httptest.NewRequest(http.MethodDelete, "/guests/bulk", bytes.NewReader([]byte("invalid json")))
+				req.Header.Set("Content-Type", "application/json")
+				ctx := context.WithValue(req.Context(), constants.ContextKeyRequestID, "test-request-id")
+				return req.WithContext(ctx)
+			},
+			expectedStatus: fiber.StatusBadRequest,
+			validate: func(t *testing.T, resp *http.Response, mockService *mocks.GuestServiceMock) {
+				assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
+				bodyBytes, _ := io.ReadAll(resp.Body)
+				var response map[string]interface{}
+				json.Unmarshal(bodyBytes, &response)
+				assert.Equal(t, float64(fiber.StatusBadRequest), response["code"])
+				assert.NotNil(t, response["error"])
+			},
+		},
+		{
+			name: "should return error when service returns error",
+			setupHandler: func(t *testing.T) *GuestHandler {
+				mockService := mocks.NewGuestServiceMock(t)
+				mockService.On("BulkDelete", mock.Anything, mock.AnythingOfType("*dtos.BulkDeleteGuestsRequestDTO")).
+					Return(errors.New("bulk delete error"))
+				return NewGuestHandler(mockService)
+			},
+			setupRequest: func(t *testing.T) *http.Request {
+				body := map[string]interface{}{
+					"ids":        []string{"01932293-d710-7f55-a9f6-66e6248ae72f"},
+					"deleted_by": "admin",
+				}
+				bodyBytes, _ := json.Marshal(body)
+				req := httptest.NewRequest(http.MethodDelete, "/guests/bulk", bytes.NewReader(bodyBytes))
+				req.Header.Set("Content-Type", "application/json")
+				ctx := context.WithValue(req.Context(), constants.ContextKeyRequestID, "test-request-id")
+				return req.WithContext(ctx)
+			},
+			expectedStatus: fiber.StatusInternalServerError,
+			validate: func(t *testing.T, resp *http.Response, mockService *mocks.GuestServiceMock) {
+				bodyBytes, _ := io.ReadAll(resp.Body)
+				var response map[string]interface{}
+				json.Unmarshal(bodyBytes, &response)
+				assert.NotNil(t, response["error"])
+			},
+		},
+		{
+			name: "should return error when service fails with gocerr",
+			setupHandler: func(t *testing.T) *GuestHandler {
+				mockService := mocks.NewGuestServiceMock(t)
+				mockService.On("BulkDelete", mock.Anything, mock.AnythingOfType("*dtos.BulkDeleteGuestsRequestDTO")).
+					Return(gocerr.New(fiber.StatusInternalServerError, "internal error"))
+				return NewGuestHandler(mockService)
+			},
+			setupRequest: func(t *testing.T) *http.Request {
+				body := map[string]interface{}{
+					"ids":        []string{"01932293-d710-7f55-a9f6-66e6248ae72f"},
+					"deleted_by": "admin",
+				}
+				bodyBytes, _ := json.Marshal(body)
+				req := httptest.NewRequest(http.MethodDelete, "/guests/bulk", bytes.NewReader(bodyBytes))
+				req.Header.Set("Content-Type", "application/json")
+				ctx := context.WithValue(req.Context(), constants.ContextKeyRequestID, "test-request-id")
+				return req.WithContext(ctx)
+			},
+			expectedStatus: fiber.StatusInternalServerError,
+			validate: func(t *testing.T, resp *http.Response, mockService *mocks.GuestServiceMock) {
+				assert.Equal(t, fiber.StatusInternalServerError, resp.StatusCode)
+				bodyBytes, _ := io.ReadAll(resp.Body)
+				var response map[string]interface{}
+				json.Unmarshal(bodyBytes, &response)
+				assert.Equal(t, float64(fiber.StatusInternalServerError), response["code"])
+				assert.NotNil(t, response["error"])
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := tt.setupHandler(t)
+			app := fiber.New()
+
+			app.Delete("/guests/bulk", handler.BulkDelete)
 
 			req := tt.setupRequest(t)
 			resp, err := app.Test(req, -1)

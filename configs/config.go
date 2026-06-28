@@ -97,6 +97,18 @@ type Config struct {
 				Enable bool   `mapstructure:"ENABLE"`
 				Topic  string `mapstructure:"TOPIC"`
 			} `mapstructure:"UPDATED"`
+			BulkCreated struct {
+				Enable bool   `mapstructure:"ENABLE"`
+				Topic  string `mapstructure:"TOPIC"`
+			} `mapstructure:"BULK_CREATED"`
+			BulkUpdated struct {
+				Enable bool   `mapstructure:"ENABLE"`
+				Topic  string `mapstructure:"TOPIC"`
+			} `mapstructure:"BULK_UPDATED"`
+			BulkDeleted struct {
+				Enable bool   `mapstructure:"ENABLE"`
+				Topic  string `mapstructure:"TOPIC"`
+			} `mapstructure:"BULK_DELETED"`
 		} `mapstructure:"EVENT"`
 	} `mapstructure:"GUEST"`
 }

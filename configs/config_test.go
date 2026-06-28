@@ -81,6 +81,12 @@ GUEST.EVENT.DELETED.TOPIC=guest.deleted
 
 GUEST.EVENT.UPDATED.ENABLE=true
 GUEST.EVENT.UPDATED.TOPIC=guest.updated
+GUEST.EVENT.BULK_CREATED.ENABLE=true
+GUEST.EVENT.BULK_CREATED.TOPIC=guest.bulk.created
+GUEST.EVENT.BULK_UPDATED.ENABLE=true
+GUEST.EVENT.BULK_UPDATED.TOPIC=guest.bulk.updated
+GUEST.EVENT.BULK_DELETED.ENABLE=true
+GUEST.EVENT.BULK_DELETED.TOPIC=guest.bulk.deleted
 `
 				err := os.WriteFile(tmpFile, []byte(content), 0644)
 				if err != nil {
@@ -105,6 +111,9 @@ GUEST.EVENT.UPDATED.TOPIC=guest.updated
 				assert.True(t, config.Guest.Cache.Enable)
 				assert.Equal(t, "guest:%s", config.Guest.Cache.Keyf)
 				assert.Equal(t, "guest.created", config.Guest.Event.Created.Topic)
+				assert.Equal(t, "guest.bulk.created", config.Guest.Event.BulkCreated.Topic)
+				assert.Equal(t, "guest.bulk.updated", config.Guest.Event.BulkUpdated.Topic)
+				assert.Equal(t, "guest.bulk.deleted", config.Guest.Event.BulkDeleted.Topic)
 			},
 		},
 		{

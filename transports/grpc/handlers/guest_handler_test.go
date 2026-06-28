@@ -12,6 +12,7 @@ import (
 	"github.com/fikri240794/gocerr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func TestImplementedBoilerplateServer_CreateGuest(t *testing.T) {
@@ -610,6 +611,360 @@ func TestImplementedBoilerplateServer_UpdateGuestByID(t *testing.T) {
 
 			requestVM, ctx := tt.setupRequest(t)
 			responseVM, err := handler.UpdateGuestByID(ctx, requestVM)
+
+			if tt.validateError != nil {
+				tt.validateError(t, err)
+			}
+			if tt.validate != nil {
+				tt.validate(t, responseVM, err)
+			}
+		})
+	}
+}
+
+func TestImplementedBoilerplateServer_BulkCreateGuests(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupRequest  func(t *testing.T) (*protobuf_boilerplate.BulkCreateGuestsRequestVM, context.Context)
+		setupMock     func(t *testing.T, mockService *service_mocks.GuestServiceMock)
+		validateError func(t *testing.T, err error)
+		validate      func(t *testing.T, responseVM *protobuf_boilerplate.BulkCreateGuestsResponseVM, err error)
+	}{
+		{
+			name: "should_bulk_create_guests_successfully",
+			setupRequest: func(t *testing.T) (*protobuf_boilerplate.BulkCreateGuestsRequestVM, context.Context) {
+				ctx := context.WithValue(context.Background(), constants.ContextKeyRequestID, "test-request-id")
+				requestVM := &protobuf_boilerplate.BulkCreateGuestsRequestVM{
+					Items: []*protobuf_boilerplate.CreateGuestRequestVM{
+						{Name: "John Doe", Address: "123 Main St"},
+					},
+				}
+				return requestVM, ctx
+			},
+			setupMock: func(t *testing.T, mockService *service_mocks.GuestServiceMock) {
+				mockService.On("BulkCreate", mock.Anything, mock.AnythingOfType("*dtos.BulkCreateGuestsRequestDTO")).
+					Return(&dtos.BulkCreateGuestsResponseDTO{
+						Guests: []dtos.GuestResponseDTO{
+							{ID: "550e8400-e29b-41d4-a716-446655440000", Name: "John Doe", Address: "123 Main St", CreatedAt: 1700000000000, CreatedBy: "00000000-0000-0000-0000-000000000000"},
+						},
+					}, nil)
+			},
+			validateError: func(t *testing.T, err error) {
+				assert.NoError(t, err)
+			},
+			validate: func(t *testing.T, responseVM *protobuf_boilerplate.BulkCreateGuestsResponseVM, err error) {
+				assert.NoError(t, err)
+				assert.NotNil(t, responseVM)
+				assert.Len(t, responseVM.Data, 1)
+				assert.Equal(t, "John Doe", responseVM.Data[0].Name)
+			},
+		},
+		{
+			name: "should_return_error_when_request_vm_is_nil",
+			setupRequest: func(t *testing.T) (*protobuf_boilerplate.BulkCreateGuestsRequestVM, context.Context) {
+				ctx := context.WithValue(context.Background(), constants.ContextKeyRequestID, "test-request-id")
+				return nil, ctx
+			},
+			setupMock: func(t *testing.T, mockService *service_mocks.GuestServiceMock) {
+			},
+			validateError: func(t *testing.T, err error) {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "requestVM is nil")
+			},
+			validate: func(t *testing.T, responseVM *protobuf_boilerplate.BulkCreateGuestsResponseVM, err error) {
+				assert.Error(t, err)
+				assert.Nil(t, responseVM)
+			},
+		},
+		{
+			name: "should_return_error_when_service_bulk_create_fails",
+			setupRequest: func(t *testing.T) (*protobuf_boilerplate.BulkCreateGuestsRequestVM, context.Context) {
+				ctx := context.WithValue(context.Background(), constants.ContextKeyRequestID, "test-request-id")
+				requestVM := &protobuf_boilerplate.BulkCreateGuestsRequestVM{
+					Items: []*protobuf_boilerplate.CreateGuestRequestVM{
+						{Name: "Jane Doe", Address: "456 Oak Ave"},
+					},
+				}
+				return requestVM, ctx
+			},
+			setupMock: func(t *testing.T, mockService *service_mocks.GuestServiceMock) {
+				mockService.On("BulkCreate", mock.Anything, mock.AnythingOfType("*dtos.BulkCreateGuestsRequestDTO")).
+					Return((*dtos.BulkCreateGuestsResponseDTO)(nil), gocerr.New(http.StatusBadRequest, "validation error"))
+			},
+			validateError: func(t *testing.T, err error) {
+				assert.Error(t, err)
+			},
+			validate: func(t *testing.T, responseVM *protobuf_boilerplate.BulkCreateGuestsResponseVM, err error) {
+				assert.Error(t, err)
+				assert.Nil(t, responseVM)
+			},
+		},
+		{
+			name: "should_return_error_when_service_bulk_create_fails_with_internal_error",
+			setupRequest: func(t *testing.T) (*protobuf_boilerplate.BulkCreateGuestsRequestVM, context.Context) {
+				ctx := context.WithValue(context.Background(), constants.ContextKeyRequestID, "test-request-id")
+				requestVM := &protobuf_boilerplate.BulkCreateGuestsRequestVM{
+					Items: []*protobuf_boilerplate.CreateGuestRequestVM{
+						{Name: "Jane Doe", Address: "456 Oak Ave"},
+					},
+				}
+				return requestVM, ctx
+			},
+			setupMock: func(t *testing.T, mockService *service_mocks.GuestServiceMock) {
+				mockService.On("BulkCreate", mock.Anything, mock.AnythingOfType("*dtos.BulkCreateGuestsRequestDTO")).
+					Return((*dtos.BulkCreateGuestsResponseDTO)(nil), gocerr.New(http.StatusInternalServerError, "internal error"))
+			},
+			validateError: func(t *testing.T, err error) {
+				assert.Error(t, err)
+			},
+			validate: func(t *testing.T, responseVM *protobuf_boilerplate.BulkCreateGuestsResponseVM, err error) {
+				assert.Error(t, err)
+				assert.Nil(t, responseVM)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockService := service_mocks.NewGuestServiceMock(t)
+			tt.setupMock(t, mockService)
+
+			handler := NewImplementedBoilerplateServer(mockService)
+
+			requestVM, ctx := tt.setupRequest(t)
+			responseVM, err := handler.BulkCreateGuests(ctx, requestVM)
+
+			if tt.validateError != nil {
+				tt.validateError(t, err)
+			}
+			if tt.validate != nil {
+				tt.validate(t, responseVM, err)
+			}
+		})
+	}
+}
+
+func TestImplementedBoilerplateServer_BulkUpdateGuests(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupRequest  func(t *testing.T) (*protobuf_boilerplate.BulkUpdateGuestsRequestVM, context.Context)
+		setupMock     func(t *testing.T, mockService *service_mocks.GuestServiceMock)
+		validateError func(t *testing.T, err error)
+		validate      func(t *testing.T, responseVM *protobuf_boilerplate.BulkUpdateGuestsResponseVM, err error)
+	}{
+		{
+			name: "should_bulk_update_guests_successfully",
+			setupRequest: func(t *testing.T) (*protobuf_boilerplate.BulkUpdateGuestsRequestVM, context.Context) {
+				ctx := context.WithValue(context.Background(), constants.ContextKeyRequestID, "test-request-id")
+				requestVM := &protobuf_boilerplate.BulkUpdateGuestsRequestVM{
+					Items: []*protobuf_boilerplate.UpdateGuestByIDRequestVM{
+						{Id: "550e8400-e29b-41d4-a716-446655440000", Name: "Updated Name"},
+					},
+				}
+				return requestVM, ctx
+			},
+			setupMock: func(t *testing.T, mockService *service_mocks.GuestServiceMock) {
+				mockService.On("BulkUpdate", mock.Anything, mock.AnythingOfType("*dtos.BulkUpdateGuestsRequestDTO")).
+					Return(&dtos.BulkUpdateGuestsResponseDTO{
+						Guests: []dtos.GuestResponseDTO{
+							{ID: "550e8400-e29b-41d4-a716-446655440000", Name: "Updated Name", Address: "123 Main St", CreatedAt: 1700000000000, CreatedBy: "admin", UpdatedAt: 1700000000001, UpdatedBy: "admin"},
+						},
+					}, nil)
+			},
+			validateError: func(t *testing.T, err error) {
+				assert.NoError(t, err)
+			},
+			validate: func(t *testing.T, responseVM *protobuf_boilerplate.BulkUpdateGuestsResponseVM, err error) {
+				assert.NoError(t, err)
+				assert.NotNil(t, responseVM)
+				assert.Len(t, responseVM.Data, 1)
+				assert.Equal(t, "Updated Name", responseVM.Data[0].Name)
+			},
+		},
+		{
+			name: "should_return_error_when_request_vm_is_nil",
+			setupRequest: func(t *testing.T) (*protobuf_boilerplate.BulkUpdateGuestsRequestVM, context.Context) {
+				ctx := context.WithValue(context.Background(), constants.ContextKeyRequestID, "test-request-id")
+				return nil, ctx
+			},
+			setupMock: func(t *testing.T, mockService *service_mocks.GuestServiceMock) {
+			},
+			validateError: func(t *testing.T, err error) {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "requestVM is nil")
+			},
+			validate: func(t *testing.T, responseVM *protobuf_boilerplate.BulkUpdateGuestsResponseVM, err error) {
+				assert.Error(t, err)
+				assert.Nil(t, responseVM)
+			},
+		},
+		{
+			name: "should_return_error_when_service_bulk_update_fails",
+			setupRequest: func(t *testing.T) (*protobuf_boilerplate.BulkUpdateGuestsRequestVM, context.Context) {
+				ctx := context.WithValue(context.Background(), constants.ContextKeyRequestID, "test-request-id")
+				requestVM := &protobuf_boilerplate.BulkUpdateGuestsRequestVM{
+					Items: []*protobuf_boilerplate.UpdateGuestByIDRequestVM{
+						{Id: "550e8400-e29b-41d4-a716-446655440000", Name: "Updated Name"},
+					},
+				}
+				return requestVM, ctx
+			},
+			setupMock: func(t *testing.T, mockService *service_mocks.GuestServiceMock) {
+				mockService.On("BulkUpdate", mock.Anything, mock.AnythingOfType("*dtos.BulkUpdateGuestsRequestDTO")).
+					Return((*dtos.BulkUpdateGuestsResponseDTO)(nil), gocerr.New(http.StatusBadRequest, "validation error"))
+			},
+			validateError: func(t *testing.T, err error) {
+				assert.Error(t, err)
+			},
+			validate: func(t *testing.T, responseVM *protobuf_boilerplate.BulkUpdateGuestsResponseVM, err error) {
+				assert.Error(t, err)
+				assert.Nil(t, responseVM)
+			},
+		},
+		{
+			name: "should_return_error_when_service_bulk_update_fails_with_internal_error",
+			setupRequest: func(t *testing.T) (*protobuf_boilerplate.BulkUpdateGuestsRequestVM, context.Context) {
+				ctx := context.WithValue(context.Background(), constants.ContextKeyRequestID, "test-request-id")
+				requestVM := &protobuf_boilerplate.BulkUpdateGuestsRequestVM{
+					Items: []*protobuf_boilerplate.UpdateGuestByIDRequestVM{
+						{Id: "550e8400-e29b-41d4-a716-446655440000", Name: "Updated Name"},
+					},
+				}
+				return requestVM, ctx
+			},
+			setupMock: func(t *testing.T, mockService *service_mocks.GuestServiceMock) {
+				mockService.On("BulkUpdate", mock.Anything, mock.AnythingOfType("*dtos.BulkUpdateGuestsRequestDTO")).
+					Return((*dtos.BulkUpdateGuestsResponseDTO)(nil), gocerr.New(http.StatusInternalServerError, "internal error"))
+			},
+			validateError: func(t *testing.T, err error) {
+				assert.Error(t, err)
+			},
+			validate: func(t *testing.T, responseVM *protobuf_boilerplate.BulkUpdateGuestsResponseVM, err error) {
+				assert.Error(t, err)
+				assert.Nil(t, responseVM)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockService := service_mocks.NewGuestServiceMock(t)
+			tt.setupMock(t, mockService)
+
+			handler := NewImplementedBoilerplateServer(mockService)
+
+			requestVM, ctx := tt.setupRequest(t)
+			responseVM, err := handler.BulkUpdateGuests(ctx, requestVM)
+
+			if tt.validateError != nil {
+				tt.validateError(t, err)
+			}
+			if tt.validate != nil {
+				tt.validate(t, responseVM, err)
+			}
+		})
+	}
+}
+
+func TestImplementedBoilerplateServer_BulkDeleteGuests(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupRequest  func(t *testing.T) (*protobuf_boilerplate.BulkDeleteGuestsRequestVM, context.Context)
+		setupMock     func(t *testing.T, mockService *service_mocks.GuestServiceMock)
+		validateError func(t *testing.T, err error)
+		validate      func(t *testing.T, responseVM *emptypb.Empty, err error)
+	}{
+		{
+			name: "should_bulk_delete_guests_successfully",
+			setupRequest: func(t *testing.T) (*protobuf_boilerplate.BulkDeleteGuestsRequestVM, context.Context) {
+				ctx := context.WithValue(context.Background(), constants.ContextKeyRequestID, "test-request-id")
+				requestVM := &protobuf_boilerplate.BulkDeleteGuestsRequestVM{
+					Ids: []string{"550e8400-e29b-41d4-a716-446655440000"},
+				}
+				return requestVM, ctx
+			},
+			setupMock: func(t *testing.T, mockService *service_mocks.GuestServiceMock) {
+				mockService.On("BulkDelete", mock.Anything, mock.AnythingOfType("*dtos.BulkDeleteGuestsRequestDTO")).
+					Return(nil)
+			},
+			validateError: func(t *testing.T, err error) {
+				assert.NoError(t, err)
+			},
+			validate: func(t *testing.T, responseVM *emptypb.Empty, err error) {
+				assert.NoError(t, err)
+				assert.NotNil(t, responseVM)
+			},
+		},
+		{
+			name: "should_return_error_when_request_vm_is_nil",
+			setupRequest: func(t *testing.T) (*protobuf_boilerplate.BulkDeleteGuestsRequestVM, context.Context) {
+				ctx := context.WithValue(context.Background(), constants.ContextKeyRequestID, "test-request-id")
+				return nil, ctx
+			},
+			setupMock: func(t *testing.T, mockService *service_mocks.GuestServiceMock) {
+			},
+			validateError: func(t *testing.T, err error) {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "requestVM is nil")
+			},
+			validate: func(t *testing.T, responseVM *emptypb.Empty, err error) {
+				assert.Error(t, err)
+				assert.Nil(t, responseVM)
+			},
+		},
+		{
+			name: "should_return_error_when_service_bulk_delete_fails",
+			setupRequest: func(t *testing.T) (*protobuf_boilerplate.BulkDeleteGuestsRequestVM, context.Context) {
+				ctx := context.WithValue(context.Background(), constants.ContextKeyRequestID, "test-request-id")
+				requestVM := &protobuf_boilerplate.BulkDeleteGuestsRequestVM{
+					Ids: []string{"550e8400-e29b-41d4-a716-446655440000"},
+				}
+				return requestVM, ctx
+			},
+			setupMock: func(t *testing.T, mockService *service_mocks.GuestServiceMock) {
+				mockService.On("BulkDelete", mock.Anything, mock.AnythingOfType("*dtos.BulkDeleteGuestsRequestDTO")).
+					Return(gocerr.New(http.StatusBadRequest, "validation error"))
+			},
+			validateError: func(t *testing.T, err error) {
+				assert.Error(t, err)
+			},
+			validate: func(t *testing.T, responseVM *emptypb.Empty, err error) {
+				assert.Error(t, err)
+				assert.Nil(t, responseVM)
+			},
+		},
+		{
+			name: "should_return_error_when_service_bulk_delete_fails_with_internal_error",
+			setupRequest: func(t *testing.T) (*protobuf_boilerplate.BulkDeleteGuestsRequestVM, context.Context) {
+				ctx := context.WithValue(context.Background(), constants.ContextKeyRequestID, "test-request-id")
+				requestVM := &protobuf_boilerplate.BulkDeleteGuestsRequestVM{
+					Ids: []string{"550e8400-e29b-41d4-a716-446655440000"},
+				}
+				return requestVM, ctx
+			},
+			setupMock: func(t *testing.T, mockService *service_mocks.GuestServiceMock) {
+				mockService.On("BulkDelete", mock.Anything, mock.AnythingOfType("*dtos.BulkDeleteGuestsRequestDTO")).
+					Return(gocerr.New(http.StatusInternalServerError, "internal error"))
+			},
+			validateError: func(t *testing.T, err error) {
+				assert.Error(t, err)
+			},
+			validate: func(t *testing.T, responseVM *emptypb.Empty, err error) {
+				assert.Error(t, err)
+				assert.Nil(t, responseVM)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockService := service_mocks.NewGuestServiceMock(t)
+			tt.setupMock(t, mockService)
+
+			handler := NewImplementedBoilerplateServer(mockService)
+
+			requestVM, ctx := tt.setupRequest(t)
+			responseVM, err := handler.BulkDeleteGuests(ctx, requestVM)
 
 			if tt.validateError != nil {
 				tt.validateError(t, err)

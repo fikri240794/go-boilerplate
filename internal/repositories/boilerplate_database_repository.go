@@ -142,7 +142,14 @@ func newBoilerplateDatabaseTransaction(tx *sqlx.Tx) *boilerplateDatabaseTransact
 }
 
 func (r *boilerplateDatabaseTransaction) Commit() error {
-	return r.tx.Commit()
+	var err error = r.tx.Commit()
+	if err != nil {
+		log.Err(err).
+			Msg("[boilerplateDatabaseTransaction][Commit] failed to commit transaction")
+		err = gocerr.New(http.StatusInternalServerError, "error")
+		return err
+	}
+	return nil
 }
 
 func (r *boilerplateDatabaseTransaction) DriverName() string {
@@ -181,6 +188,7 @@ func (r *boilerplateDatabaseTransaction) Rollback() error {
 	if err != nil {
 		log.Err(err).
 			Msg("[boilerplateDatabaseTransaction][Rollback] failed to rollback transaction")
+		err = gocerr.New(http.StatusInternalServerError, "error")
 		return err
 	}
 
@@ -193,6 +201,10 @@ func (r *boilerplateDatabaseTransaction) Rollback() error {
 //mockery:output: internal/repositories/mocks/
 type IBoilerplateDatabaseRepository[TEntity interface{}] interface {
 	BeginTransaction(ctx context.Context) (IBoilerplateDatabaseTransaction, error)
+
+	BulkCreate(ctx context.Context, entities []TEntity) error
+
+	BulkUpdate(ctx context.Context, entities []TEntity) error
 
 	Count(
 		ctx context.Context,
@@ -258,6 +270,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) getTableNameAndFields() (string
 		tag = field.Tag.Get("table")
 		if tag != "" && tag != "-" {
 			tableName = tag
+			continue
 		}
 
 		tag = field.Tag.Get("db")
@@ -269,37 +282,127 @@ func (r *BoilerplateDatabaseRepository[TEntity]) getTableNameAndFields() (string
 	return tableName, fields
 }
 
-func (r *BoilerplateDatabaseRepository[TEntity]) getTableNameAndMapFieldWithValueFrom(entity *TEntity) (string, map[string]interface{}) {
+type entityMeta struct {
+	TableName     string
+	PrimaryKey    string
+	FieldTypeMap  map[string]string
+	FieldValueMap map[string]interface{}
+}
+
+func (r *BoilerplateDatabaseRepository[TEntity]) getEntityMeta(entity *TEntity) entityMeta {
 	var (
-		tableName        string
-		mapFieldAndValue map[string]interface{}
-		entityType       reflect.Type
-		field            reflect.StructField
-		tag              string
+		entityType reflect.Type
+		field      reflect.StructField
+		tagValue   string
+		dbTag      string
+		meta       entityMeta
 	)
 
-	mapFieldAndValue = map[string]interface{}{}
+	meta = entityMeta{
+		FieldValueMap: map[string]interface{}{},
+		FieldTypeMap:  map[string]string{},
+	}
 
 	entityType = reflect.TypeOf(entity).Elem()
 
 	for i := range entityType.NumField() {
 		field = entityType.Field(i)
 
-		tag = field.Tag.Get("table")
-		if tag != "" && tag != "-" {
-			tableName = tag
+		tagValue = field.Tag.Get("table")
+		if tagValue != "" && tagValue != "-" {
+			meta.TableName = tagValue
 			continue
 		}
 
-		tag = field.Tag.Get("db")
-		if tag == "" || tag == "-" {
+		dbTag = field.Tag.Get("db")
+		if dbTag == "" || dbTag == "-" {
 			continue
 		}
 
-		mapFieldAndValue[tag] = reflect.ValueOf(entity).Elem().Field(i).Interface()
+		meta.FieldValueMap[dbTag] = reflect.ValueOf(entity).Elem().Field(i).Interface()
+
+		tagValue = field.Tag.Get("db_type")
+		if tagValue != "" {
+			meta.FieldTypeMap[dbTag] = tagValue
+		}
+
+		tagValue = field.Tag.Get("primary_key")
+		if tagValue == "true" {
+			meta.PrimaryKey = dbTag
+		}
 	}
 
-	return tableName, mapFieldAndValue
+	return meta
+}
+
+func (r *BoilerplateDatabaseRepository[TEntity]) prepareQueryStatement(
+	ctx context.Context,
+	logFields map[string]interface{},
+	query string,
+	useMaster bool,
+	fnName string,
+) (IBoilerplateDatabaseStatement, error) {
+	var (
+		stmt     IBoilerplateDatabaseStatement
+		sqlxStmt *sqlx.Stmt
+		err      error
+	)
+
+	if useMaster {
+		if r.tx != nil {
+			stmt, err = r.tx.Prepare(ctx, query)
+			if err != nil {
+				log.Err(err).
+					Ctx(ctx).
+					Fields(logFields).
+					Msg(fmt.Sprintf("[BoilerplateDatabaseRepository][%s][Prepare] failed to prepare statement", fnName))
+				err = gocerr.New(http.StatusInternalServerError, "error")
+				return nil, err
+			}
+		} else {
+			sqlxStmt, err = r.db.Master.PreparexContext(ctx, query)
+			if err != nil {
+				log.Err(err).
+					Ctx(ctx).
+					Fields(logFields).
+					Msg(fmt.Sprintf("[BoilerplateDatabaseRepository][%s][PreparexContext] failed to prepare statement", fnName))
+				err = gocerr.New(http.StatusInternalServerError, "error")
+				return nil, err
+			}
+
+			stmt = newBoilerplateDatabaseStatement(sqlxStmt)
+		}
+	} else {
+		sqlxStmt, err = r.db.Slave.PreparexContext(ctx, query)
+		if err != nil {
+			log.Err(err).
+				Ctx(ctx).
+				Fields(logFields).
+				Msg(fmt.Sprintf("[BoilerplateDatabaseRepository][%s][PreparexContext] failed to prepare statement", fnName))
+			err = gocerr.New(http.StatusInternalServerError, "error")
+			return nil, err
+		}
+
+		stmt = newBoilerplateDatabaseStatement(sqlxStmt)
+	}
+
+	return stmt, nil
+}
+
+func (r *BoilerplateDatabaseRepository[TEntity]) logSlowQuery(
+	logFields map[string]interface{},
+	duration time.Duration,
+	threshold time.Duration,
+	fnName string,
+) {
+	logFields["duration"] = fmt.Sprintf("%.3f ms", (float64(duration) / float64(time.Millisecond)))
+
+	if duration > threshold {
+		log.Warn().
+			Ctx(context.Background()).
+			Fields(logFields).
+			Msg(fmt.Sprintf("[BoilerplateDatabaseRepository][%s] slow query", fnName))
+	}
 }
 
 func (r *BoilerplateDatabaseRepository[TEntity]) exec(ctx context.Context, query string, args ...interface{}) error {
@@ -307,7 +410,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) exec(ctx context.Context, query
 		span               trace.Span
 		logFields          map[string]interface{}
 		stmt               IBoilerplateDatabaseStatement
-		sqlxStmt           *sqlx.Stmt
 		queryExecStartTime time.Time
 		queryExecEndTime   time.Time
 		queryExecDuration  time.Duration
@@ -322,28 +424,9 @@ func (r *BoilerplateDatabaseRepository[TEntity]) exec(ctx context.Context, query
 		"args":  args,
 	}
 
-	if r.tx != nil {
-		stmt, err = r.tx.Prepare(ctx, query)
-		if err != nil {
-			log.Err(err).
-				Ctx(ctx).
-				Fields(logFields).
-				Msg("[BoilerplateDatabaseRepository][exec][Prepare] failed to prepare statement")
-			err = gocerr.New(http.StatusInternalServerError, err.Error())
-			return err
-		}
-	} else {
-		sqlxStmt, err = r.db.Master.PreparexContext(ctx, query)
-		if err != nil {
-			log.Err(err).
-				Ctx(ctx).
-				Fields(logFields).
-				Msg("[BoilerplateDatabaseRepository][exec][PreparexContext] failed to prepare statement")
-			err = gocerr.New(http.StatusInternalServerError, err.Error())
-			return err
-		}
-
-		stmt = newBoilerplateDatabaseStatement(sqlxStmt)
+	stmt, err = r.prepareQueryStatement(ctx, logFields, query, true, "exec")
+	if err != nil {
+		return err
 	}
 	defer func() {
 		var errCloseStmt = stmt.Close()
@@ -363,7 +446,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) exec(ctx context.Context, query
 			Ctx(ctx).
 			Fields(logFields).
 			Msg("[BoilerplateDatabaseRepository][exec][Exec] failed to exec statement")
-		err = gocerr.New(http.StatusInternalServerError, err.Error())
+		err = gocerr.New(http.StatusInternalServerError, "error")
 		return err
 	}
 
@@ -405,7 +488,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) BeginTransaction(ctx context.Co
 			Ctx(ctx).
 			Fields(logFields).
 			Msg("[BoilerplateDatabaseRepository][BeginTransaction][BeginTxx] failed to begin transaction")
-		err = gocerr.New(http.StatusInternalServerError, err.Error())
+		err = gocerr.New(http.StatusInternalServerError, "error")
 		return nil, err
 	}
 
@@ -422,13 +505,12 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Count(
 	var (
 		span               trace.Span
 		logFields          map[string]interface{}
-		table              string
+		tableName          string
 		selectQuery        *goqube.SelectQuery
 		dialect            goqube.Dialect
 		query              string
 		args               []interface{}
 		stmt               IBoilerplateDatabaseStatement
-		sqlxStmt           *sqlx.Stmt
 		queryExecStartTime time.Time
 		queryExecEndTime   time.Time
 		queryExecDuration  time.Duration
@@ -443,11 +525,11 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Count(
 		"useMaster": useMaster,
 	}
 
-	table, _ = r.getTableNameAndFields()
+	tableName, _ = r.getTableNameAndFields()
 
 	selectQuery = &goqube.SelectQuery{
 		Fields: []goqube.Field{{Column: "COUNT(-1)"}},
-		Table:  goqube.Table{Name: table},
+		Table:  goqube.Table{Name: tableName},
 		Filter: filter,
 	}
 	logFields["selectQuery"] = selectQuery
@@ -474,42 +556,9 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Count(
 	logFields["query"] = query
 	logFields["args"] = args
 
-	if useMaster {
-		if r.tx != nil {
-			stmt, err = r.tx.Prepare(ctx, query)
-			if err != nil {
-				log.Err(err).
-					Ctx(ctx).
-					Fields(logFields).
-					Msg("[BoilerplateDatabaseRepository][Count][Prepare] failed to prepare statement")
-				err = gocerr.New(http.StatusInternalServerError, err.Error())
-				return 0, err
-			}
-		} else {
-			sqlxStmt, err = r.db.Master.PreparexContext(ctx, query)
-			if err != nil {
-				log.Err(err).
-					Ctx(ctx).
-					Fields(logFields).
-					Msg("[BoilerplateDatabaseRepository][Count][PreparexContext] failed to prepare statement")
-				err = gocerr.New(http.StatusInternalServerError, err.Error())
-				return 0, err
-			}
-
-			stmt = newBoilerplateDatabaseStatement(sqlxStmt)
-		}
-	} else {
-		sqlxStmt, err = r.db.Slave.PreparexContext(ctx, query)
-		if err != nil {
-			log.Err(err).
-				Ctx(ctx).
-				Fields(logFields).
-				Msg("[BoilerplateDatabaseRepository][Count][PreparexContext] failed to prepare statement")
-			err = gocerr.New(http.StatusInternalServerError, err.Error())
-			return 0, err
-		}
-
-		stmt = newBoilerplateDatabaseStatement(sqlxStmt)
+	stmt, err = r.prepareQueryStatement(ctx, logFields, query, useMaster, "Count")
+	if err != nil {
+		return 0, err
 	}
 	defer func() {
 		var errCloseStmt = stmt.Close()
@@ -532,7 +581,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Count(
 				Ctx(ctx).
 				Fields(logFields).
 				Msg("[BoilerplateDatabaseRepository][Count][Get] failed to count entities")
-			err = gocerr.New(http.StatusInternalServerError, err.Error())
+			err = gocerr.New(http.StatusInternalServerError, "error")
 		}
 
 		return 0, err
@@ -540,29 +589,21 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Count(
 
 	queryExecEndTime = time.Now()
 	queryExecDuration = queryExecEndTime.Sub(queryExecStartTime)
-	logFields["duration"] = fmt.Sprintf("%.3f ms", (float64(queryExecDuration) / float64(time.Millisecond)))
-
-	if queryExecDuration > r.db.SlaveMaxQueryDurationWarning {
-		log.Warn().
-			Ctx(ctx).
-			Fields(logFields).
-			Msg("[BoilerplateDatabaseRepository][Count] slow query")
-	}
+	r.logSlowQuery(logFields, queryExecDuration, r.db.SlaveMaxQueryDurationWarning, "Count")
 
 	return count, nil
 }
 
 func (r *BoilerplateDatabaseRepository[TEntity]) Create(ctx context.Context, entity *TEntity) error {
 	var (
-		span              trace.Span
-		logFields         map[string]interface{}
-		table             string
-		mapFieldWithValue map[string]interface{}
-		insertQuery       *goqube.InsertQuery
-		dialect           goqube.Dialect
-		query             string
-		args              []interface{}
-		err               error
+		span        trace.Span
+		logFields   map[string]interface{}
+		meta        entityMeta
+		insertQuery *goqube.InsertQuery
+		dialect     goqube.Dialect
+		query       string
+		args        []interface{}
+		err         error
 	)
 
 	ctx, span = tracer.Start(ctx, "[BoilerplateDatabaseRepository][Create]")
@@ -576,11 +617,11 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Create(ctx context.Context, ent
 		"entity": entity,
 	}
 
-	table, mapFieldWithValue = r.getTableNameAndMapFieldWithValueFrom(entity)
+	meta = r.getEntityMeta(entity)
 
 	insertQuery = &goqube.InsertQuery{
-		Table:  table,
-		Values: []map[string]interface{}{mapFieldWithValue},
+		Table:  meta.TableName,
+		Values: []map[string]interface{}{meta.FieldValueMap},
 	}
 	logFields["insertQuery"] = insertQuery
 
@@ -605,7 +646,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Create(ctx context.Context, ent
 			Ctx(ctx).
 			Fields(logFields).
 			Msg("[BoilerplateDatabaseRepository][Create][exec] failed to create entity")
-		err = gocerr.New(http.StatusInternalServerError, err.Error())
 		return err
 	}
 
@@ -616,7 +656,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Delete(ctx context.Context, fil
 	var (
 		span        trace.Span
 		logFields   map[string]interface{}
-		table       string
+		tableName   string
 		deleteQuery *goqube.DeleteQuery
 		dialect     goqube.Dialect
 		query       string
@@ -629,10 +669,10 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Delete(ctx context.Context, fil
 
 	logFields = map[string]interface{}{}
 
-	table, _ = r.getTableNameAndFields()
+	tableName, _ = r.getTableNameAndFields()
 
 	deleteQuery = &goqube.DeleteQuery{
-		Table:  table,
+		Table:  tableName,
 		Filter: filter,
 	}
 	logFields["deleteQuery"] = deleteQuery
@@ -658,7 +698,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Delete(ctx context.Context, fil
 			Ctx(ctx).
 			Fields(logFields).
 			Msg("[BoilerplateDatabaseRepository][Delete][exec] failed to delete entity")
-		err = gocerr.New(http.StatusInternalServerError, err.Error())
 		return err
 	}
 
@@ -676,7 +715,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindAll(
 	var (
 		span               trace.Span
 		logFields          map[string]interface{}
-		table              string
+		tableName          string
 		fields             []string
 		selectFields       []goqube.Field
 		selectQuery        *goqube.SelectQuery
@@ -684,7 +723,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindAll(
 		query              string
 		args               []interface{}
 		stmt               IBoilerplateDatabaseStatement
-		sqlxStmt           *sqlx.Stmt
 		queryExecStartTime time.Time
 		queryExecEndTime   time.Time
 		queryExecDuration  time.Duration
@@ -699,7 +737,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindAll(
 		"useMaster": useMaster,
 	}
 
-	table, fields = r.getTableNameAndFields()
+	tableName, fields = r.getTableNameAndFields()
 
 	selectFields = []goqube.Field{}
 	for i := range fields {
@@ -708,7 +746,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindAll(
 
 	selectQuery = &goqube.SelectQuery{
 		Fields: selectFields,
-		Table:  goqube.Table{Name: table},
+		Table:  goqube.Table{Name: tableName},
 		Filter: filter,
 		Sorts:  sorts,
 		Take:   take,
@@ -738,42 +776,9 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindAll(
 	logFields["query"] = query
 	logFields["args"] = args
 
-	if useMaster {
-		if r.tx != nil {
-			stmt, err = r.tx.Prepare(ctx, query)
-			if err != nil {
-				log.Err(err).
-					Ctx(ctx).
-					Fields(logFields).
-					Msg("[BoilerplateDatabaseRepository][FindAll][Prepare] failed to prepare statement")
-				err = gocerr.New(http.StatusInternalServerError, err.Error())
-				return nil, err
-			}
-		} else {
-			sqlxStmt, err = r.db.Master.PreparexContext(ctx, query)
-			if err != nil {
-				log.Err(err).
-					Ctx(ctx).
-					Fields(logFields).
-					Msg("[BoilerplateDatabaseRepository][FindAll][PreparexContext] failed to prepare statement")
-				err = gocerr.New(http.StatusInternalServerError, err.Error())
-				return nil, err
-			}
-
-			stmt = newBoilerplateDatabaseStatement(sqlxStmt)
-		}
-	} else {
-		sqlxStmt, err = r.db.Slave.PreparexContext(ctx, query)
-		if err != nil {
-			log.Err(err).
-				Ctx(ctx).
-				Fields(logFields).
-				Msg("[BoilerplateDatabaseRepository][FindAll][PreparexContext] failed to prepare statement")
-			err = gocerr.New(http.StatusInternalServerError, err.Error())
-			return nil, err
-		}
-
-		stmt = newBoilerplateDatabaseStatement(sqlxStmt)
+	stmt, err = r.prepareQueryStatement(ctx, logFields, query, useMaster, "FindAll")
+	if err != nil {
+		return nil, err
 	}
 	defer func() {
 		var errCloseStmt = stmt.Close()
@@ -794,20 +799,13 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindAll(
 			Ctx(ctx).
 			Fields(logFields).
 			Msg("[BoilerplateDatabaseRepository][FindAll][Select] failed to select entities")
-		err = gocerr.New(http.StatusInternalServerError, err.Error())
+		err = gocerr.New(http.StatusInternalServerError, "error")
 		return nil, err
 	}
 
 	queryExecEndTime = time.Now()
 	queryExecDuration = queryExecEndTime.Sub(queryExecStartTime)
-	logFields["duration"] = fmt.Sprintf("%.3f ms", (float64(queryExecDuration) / float64(time.Millisecond)))
-
-	if queryExecDuration > r.db.SlaveMaxQueryDurationWarning {
-		log.Warn().
-			Ctx(ctx).
-			Fields(logFields).
-			Msg("[BoilerplateDatabaseRepository][FindAll] slow query")
-	}
+	r.logSlowQuery(logFields, queryExecDuration, r.db.SlaveMaxQueryDurationWarning, "FindAll")
 
 	return entities, nil
 }
@@ -821,7 +819,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 	var (
 		span               trace.Span
 		logFields          map[string]interface{}
-		table              string
+		tableName          string
 		fields             []string
 		selectFields       []goqube.Field
 		selectQuery        *goqube.SelectQuery
@@ -829,7 +827,6 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 		query              string
 		args               []interface{}
 		stmt               IBoilerplateDatabaseStatement
-		sqlxStmt           *sqlx.Stmt
 		queryExecStartTime time.Time
 		queryExecEndTime   time.Time
 		queryExecDuration  time.Duration
@@ -844,7 +841,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 		"useMaster": useMaster,
 	}
 
-	table, fields = r.getTableNameAndFields()
+	tableName, fields = r.getTableNameAndFields()
 
 	selectFields = []goqube.Field{}
 	for i := range fields {
@@ -853,7 +850,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 
 	selectQuery = &goqube.SelectQuery{
 		Fields: selectFields,
-		Table:  goqube.Table{Name: table},
+		Table:  goqube.Table{Name: tableName},
 		Filter: filter,
 		Sorts:  sorts,
 		Take:   1,
@@ -882,42 +879,9 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 	logFields["query"] = query
 	logFields["args"] = args
 
-	if useMaster {
-		if r.tx != nil {
-			stmt, err = r.tx.Prepare(ctx, query)
-			if err != nil {
-				log.Err(err).
-					Ctx(ctx).
-					Fields(logFields).
-					Msg("[BoilerplateDatabaseRepository][FindOne][Prepare] failed to prepare statement")
-				err = gocerr.New(http.StatusInternalServerError, err.Error())
-				return nil, err
-			}
-		} else {
-			sqlxStmt, err = r.db.Master.PreparexContext(ctx, query)
-			if err != nil {
-				log.Err(err).
-					Ctx(ctx).
-					Fields(logFields).
-					Msg("[BoilerplateDatabaseRepository][FindOne][PreparexContext] failed to prepare statement")
-				err = gocerr.New(http.StatusInternalServerError, err.Error())
-				return nil, err
-			}
-
-			stmt = newBoilerplateDatabaseStatement(sqlxStmt)
-		}
-	} else {
-		sqlxStmt, err = r.db.Slave.PreparexContext(ctx, query)
-		if err != nil {
-			log.Err(err).
-				Ctx(ctx).
-				Fields(logFields).
-				Msg("[BoilerplateDatabaseRepository][FindOne][PreparexContext] failed to prepare statement")
-			err = gocerr.New(http.StatusInternalServerError, err.Error())
-			return nil, err
-		}
-
-		stmt = newBoilerplateDatabaseStatement(sqlxStmt)
+	stmt, err = r.prepareQueryStatement(ctx, logFields, query, useMaster, "FindOne")
+	if err != nil {
+		return nil, err
 	}
 	defer func() {
 		var errCloseStmt = stmt.Close()
@@ -941,7 +905,7 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 				Ctx(ctx).
 				Fields(logFields).
 				Msg("[BoilerplateDatabaseRepository][FindOne][GetContext] failed to select entity")
-			err = gocerr.New(http.StatusInternalServerError, err.Error())
+			err = gocerr.New(http.StatusInternalServerError, "error")
 		}
 
 		return nil, err
@@ -949,29 +913,21 @@ func (r *BoilerplateDatabaseRepository[TEntity]) FindOne(
 
 	queryExecEndTime = time.Now()
 	queryExecDuration = queryExecEndTime.Sub(queryExecStartTime)
-	logFields["duration"] = fmt.Sprintf("%.3f ms", (float64(queryExecDuration) / float64(time.Millisecond)))
-
-	if queryExecDuration > r.db.SlaveMaxQueryDurationWarning {
-		log.Warn().
-			Ctx(ctx).
-			Fields(logFields).
-			Msg("[BoilerplateDatabaseRepository][FindOne] slow query")
-	}
+	r.logSlowQuery(logFields, queryExecDuration, r.db.SlaveMaxQueryDurationWarning, "FindOne")
 
 	return entity, nil
 }
 
 func (r *BoilerplateDatabaseRepository[TEntity]) Update(ctx context.Context, entity *TEntity, filter *goqube.Filter) error {
 	var (
-		span               trace.Span
-		logFields          map[string]interface{}
-		table              string
-		mapFieldWithValues map[string]interface{}
-		updateQuery        *goqube.UpdateQuery
-		dialect            goqube.Dialect
-		query              string
-		args               []interface{}
-		err                error
+		span        trace.Span
+		logFields   map[string]interface{}
+		meta        entityMeta
+		updateQuery *goqube.UpdateQuery
+		dialect     goqube.Dialect
+		query       string
+		args        []interface{}
+		err         error
 	)
 
 	ctx, span = tracer.Start(ctx, "[BoilerplateDatabaseRepository][Update]")
@@ -985,11 +941,11 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Update(ctx context.Context, ent
 		"entity": entity,
 	}
 
-	table, mapFieldWithValues = r.getTableNameAndMapFieldWithValueFrom(entity)
+	meta = r.getEntityMeta(entity)
 
 	updateQuery = &goqube.UpdateQuery{
-		Table:       table,
-		FieldsValue: mapFieldWithValues,
+		Table:       meta.TableName,
+		FieldsValue: meta.FieldValueMap,
 		Filter:      filter,
 	}
 	logFields["updateQuery"] = updateQuery
@@ -1016,7 +972,133 @@ func (r *BoilerplateDatabaseRepository[TEntity]) Update(ctx context.Context, ent
 			Ctx(ctx).
 			Fields(logFields).
 			Msg("[BoilerplateDatabaseRepository][Update][exec] failed to update entity")
+		return err
+	}
+
+	return nil
+}
+
+func (r *BoilerplateDatabaseRepository[TEntity]) BulkCreate(ctx context.Context, entities []TEntity) error {
+	var (
+		span         trace.Span
+		logFields    map[string]interface{}
+		fieldsValues []map[string]interface{}
+		meta         entityMeta
+		insertQuery  *goqube.InsertQuery
+		dialect      goqube.Dialect
+		query        string
+		args         []interface{}
+		err          error
+	)
+
+	ctx, span = tracer.Start(ctx, "[BoilerplateDatabaseRepository][BulkCreate]")
+	defer span.End()
+
+	if len(entities) <= 0 {
+		return nil
+	}
+
+	logFields = map[string]interface{}{
+		"entities": entities,
+	}
+
+	fieldsValues = []map[string]interface{}{}
+	for i := range entities {
+		meta = r.getEntityMeta(&entities[i])
+		fieldsValues = append(fieldsValues, meta.FieldValueMap)
+	}
+
+	insertQuery = &goqube.InsertQuery{
+		Table:  meta.TableName,
+		Values: fieldsValues,
+	}
+	logFields["insertQuery"] = insertQuery
+
+	dialect = goqube.Dialect(r.db.Master.DriverName())
+	logFields["dialect"] = dialect
+
+	query, args, err = insertQuery.BuildInsertQuery(dialect)
+	if err != nil {
+		log.Err(err).
+			Ctx(ctx).
+			Fields(logFields).
+			Msg("[BoilerplateDatabaseRepository][BulkCreate][ToSQLWithArgs] failed to build insert query")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
+		return err
+	}
+	logFields["query"] = query
+	logFields["args"] = args
+
+	err = r.exec(ctx, query, args...)
+	if err != nil {
+		log.Err(err).
+			Ctx(ctx).
+			Fields(logFields).
+			Msg("[BoilerplateDatabaseRepository][BulkCreate][exec] failed to bulk create entities")
+		return err
+	}
+
+	return nil
+}
+
+func (r *BoilerplateDatabaseRepository[TEntity]) BulkUpdate(ctx context.Context, entities []TEntity) error {
+	var (
+		span            trace.Span
+		logFields       map[string]interface{}
+		fieldsValues    []map[string]interface{}
+		meta            entityMeta
+		bulkUpdateQuery *goqube.BulkUpdateQuery
+		dialect         goqube.Dialect
+		query           string
+		args            []interface{}
+		err             error
+	)
+
+	ctx, span = tracer.Start(ctx, "[BoilerplateDatabaseRepository][BulkUpdate]")
+	defer span.End()
+
+	if len(entities) <= 0 {
+		return nil
+	}
+	logFields = map[string]interface{}{
+		"entities": entities,
+	}
+
+	fieldsValues = []map[string]interface{}{}
+	for i := range entities {
+		meta = r.getEntityMeta(&entities[i])
+		fieldsValues = append(fieldsValues, meta.FieldValueMap)
+	}
+
+	bulkUpdateQuery = &goqube.BulkUpdateQuery{
+		Table:        meta.TableName,
+		PrimaryKey:   meta.PrimaryKey,
+		FieldsValues: fieldsValues,
+		ColumnsType:  meta.FieldTypeMap,
+	}
+	logFields["bulkUpdateQuery"] = bulkUpdateQuery
+
+	dialect = goqube.Dialect(r.db.Master.DriverName())
+	logFields["dialect"] = dialect
+
+	query, args, err = bulkUpdateQuery.BuildBulkUpdateQuery(dialect)
+	if err != nil {
+		log.Err(err).
+			Ctx(ctx).
+			Fields(logFields).
+			Msg("[BoilerplateDatabaseRepository][BulkUpdate][BuildBulkUpdateQuery] failed to build bulk update query")
+		err = gocerr.New(http.StatusInternalServerError, err.Error())
+		return err
+	}
+	logFields["query"] = query
+	logFields["args"] = args
+
+	err = r.exec(ctx, query, args...)
+	if err != nil {
+		log.Err(err).
+			Ctx(ctx).
+			Fields(logFields).
+			Msg("[BoilerplateDatabaseRepository][BulkUpdate][exec] failed to bulk update entities")
 		return err
 	}
 

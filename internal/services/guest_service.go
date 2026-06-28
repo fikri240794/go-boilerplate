@@ -25,6 +25,9 @@ import (
 //mockery:filename: guest_service_mock.go
 //mockery:output: internal/services/mocks/
 type IGuestService interface {
+	BulkCreate(ctx context.Context, requestDTO *dtos.BulkCreateGuestsRequestDTO) (*dtos.BulkCreateGuestsResponseDTO, error)
+	BulkDelete(ctx context.Context, requestDTO *dtos.BulkDeleteGuestsRequestDTO) error
+	BulkUpdate(ctx context.Context, requestDTO *dtos.BulkUpdateGuestsRequestDTO) (*dtos.BulkUpdateGuestsResponseDTO, error)
 	Create(ctx context.Context, requestDTO *dtos.CreateGuestRequestDTO) (*dtos.GuestResponseDTO, error)
 	DeleteByID(ctx context.Context, requestDTO *dtos.DeleteGuestByIDRequestDTO) error
 	FindAll(ctx context.Context, requestDTO *dtos.FindAllGuestRequestDTO) (*dtos.FindAllGuestResponseDTO, error)
@@ -101,14 +104,188 @@ func (s *GuestService) deleteEntityCaches(ctx context.Context) error {
 	return nil
 }
 
+func (s *GuestService) withTransaction(
+	ctx context.Context,
+	logFields map[string]interface{},
+	fnName string,
+	fn func(repositories.IBoilerplateDatabaseTransaction) error,
+) error {
+	var (
+		tx          repositories.IBoilerplateDatabaseTransaction
+		errRollback error
+		err         error
+	)
+
+	tx, err = s.guestRepository.BeginTransaction(ctx)
+	if err != nil {
+		log.Err(err).
+			Ctx(ctx).
+			Fields(logFields).
+			Msg(fmt.Sprintf("[GuestService][%s][BeginTransaction] failed to begin transaction", fnName))
+		return err
+	}
+
+	err = fn(tx)
+	if err != nil {
+		log.Err(err).
+			Ctx(ctx).
+			Fields(logFields).
+			Msg(fmt.Sprintf("[GuestService][%s][WithTransaction] failed to execute operation", fnName))
+
+		errRollback = tx.Rollback()
+		if errRollback != nil {
+			log.Err(errRollback).
+				Ctx(ctx).
+				Fields(logFields).
+				Msg(fmt.Sprintf("[GuestService][%s][Rollback] failed to rollback transaction", fnName))
+		}
+
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Err(err).
+			Ctx(ctx).
+			Fields(logFields).
+			Msg(fmt.Sprintf("[GuestService][%s][Commit] failed to commit transaction", fnName))
+
+		errRollback = tx.Rollback()
+		if errRollback != nil {
+			log.Err(errRollback).
+				Ctx(ctx).
+				Fields(logFields).
+				Msg(fmt.Sprintf("[GuestService][%s][Rollback] failed to rollback transaction", fnName))
+		}
+
+		return err
+	}
+
+	return nil
+}
+
+func (s *GuestService) buildActiveEntityFilterByID(id string) *goqube.Filter {
+	return &goqube.Filter{
+		Logic: goqube.LogicAnd,
+		Filters: []goqube.Filter{
+			{
+				Field:    goqube.Field{Column: entities.GuestEntityDatabaseFieldID},
+				Operator: goqube.OperatorEqual,
+				Value:    goqube.FilterValue{Value: id},
+			},
+			{
+				Field:    goqube.Field{Column: entities.GuestEntityDatabaseFieldDeletedAt},
+				Operator: goqube.OperatorIsNull,
+				Value:    goqube.FilterValue{Value: nil},
+			},
+		},
+	}
+}
+
+func (s *GuestService) buildActiveEntityFilterByIDs(ids []string) *goqube.Filter {
+	return &goqube.Filter{
+		Logic: goqube.LogicAnd,
+		Filters: []goqube.Filter{
+			{
+				Field:    goqube.Field{Column: entities.GuestEntityDatabaseFieldID},
+				Operator: goqube.OperatorIn,
+				Value:    goqube.FilterValue{Value: ids},
+			},
+			{
+				Field:    goqube.Field{Column: entities.GuestEntityDatabaseFieldDeletedAt},
+				Operator: goqube.OperatorIsNull,
+				Value:    goqube.FilterValue{Value: nil},
+			},
+		},
+	}
+}
+
+func (s *GuestService) tryDeleteEntityCaches(ctx context.Context, logFields map[string]interface{}, fnName string) {
+	var err error
+
+	err = s.deleteEntityCaches(ctx)
+	if err != nil {
+		log.Err(err).
+			Ctx(ctx).
+			Fields(logFields).
+			Msg(fmt.Sprintf("[GuestService][%s][deleteEntityCaches] failed to delete caches", fnName))
+	}
+}
+
+func (s *GuestService) publishSingleEvent(
+	ctx context.Context,
+	logFields map[string]interface{},
+	enable bool,
+	topic string,
+	entity *entities.GuestEntity,
+	fnName string,
+) {
+	var (
+		eventEntity *entities.EventEntity[entities.GuestEventEntity]
+		err         error
+	)
+
+	if !enable {
+		return
+	}
+
+	logFields["eventTopic"] = topic
+
+	eventEntity = entities.NewEventEntity(topic, entities.NewGuestEventEntity(entity))
+	logFields["eventEntity"] = eventEntity
+
+	err = s.guestEventProducerRepository.Publish(ctx, topic, eventEntity)
+	if err != nil {
+		log.Err(err).
+			Ctx(ctx).
+			Fields(logFields).
+			Msg(fmt.Sprintf("[GuestService][%s][Publish] failed to publish message", fnName))
+	}
+}
+
+func (s *GuestService) publishBulkEvent(
+	ctx context.Context,
+	logFields map[string]interface{},
+	enable bool,
+	topic string,
+	entities_ []entities.GuestEntity,
+	fnName string,
+) {
+	var (
+		eventEntities []entities.GuestEventEntity
+		err           error
+	)
+
+	if !enable {
+		return
+	}
+
+	logFields["eventTopic"] = topic
+
+	for i := range entities_ {
+		eventEntities = append(eventEntities, *entities.NewGuestEventEntity(&entities_[i]))
+	}
+	logFields["eventEntities"] = eventEntities
+
+	err = s.guestEventProducerRepository.PublishBulk(
+		ctx,
+		topic,
+		entities.NewEventEntity(topic, &eventEntities),
+	)
+	if err != nil {
+		log.Err(err).
+			Ctx(ctx).
+			Fields(logFields).
+			Msg(fmt.Sprintf("[GuestService][%s][PublishBulk] failed to publish message", fnName))
+	}
+}
+
 func (s *GuestService) Create(ctx context.Context, requestDTO *dtos.CreateGuestRequestDTO) (*dtos.GuestResponseDTO, error) {
 	var (
 		span        trace.Span
 		logFields   map[string]interface{}
 		entity      *entities.GuestEntity
-		tx          repositories.IBoilerplateDatabaseTransaction
 		responseDTO *dtos.GuestResponseDTO
-		eventEntity *entities.EventEntity[entities.GuestEventEntity]
 		err         error
 	)
 
@@ -136,97 +313,30 @@ func (s *GuestService) Create(ctx context.Context, requestDTO *dtos.CreateGuestR
 	entity = requestDTO.ToEntity()
 	logFields["entity"] = entity
 
-	tx, err = s.guestRepository.BeginTransaction(ctx)
+	err = s.withTransaction(ctx, logFields, "Create", func(tx repositories.IBoilerplateDatabaseTransaction) error {
+		return s.guestRepository.WithTransaction(tx).Create(ctx, entity)
+	})
 	if err != nil {
-		log.Err(err).
-			Ctx(ctx).
-			Fields(logFields).
-			Msg("[GuestService][Create][BeginTransaction] failed to begin transaction")
-		return nil, err
-	}
-
-	err = s.guestRepository.WithTransaction(tx).
-		Create(ctx, entity)
-	if err != nil {
-		log.Err(err).
-			Ctx(ctx).
-			Fields(logFields).
-			Msg("[GuestService][Create][WithTransaction][Create] failed to create entity")
-
-		var errRollback error = tx.Rollback()
-		if errRollback != nil {
-			log.Err(errRollback).
-				Ctx(ctx).
-				Fields(logFields).
-				Msg("[GuestService][Create][Rollback] failed to rollback transaction")
-		}
-
-		return nil, err
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		log.Err(err).
-			Ctx(ctx).
-			Fields(logFields).
-			Msg("[GuestService][Create][Commit] failed to commit transaction")
-
-		var errRollback error = tx.Rollback()
-		if errRollback != nil {
-			log.Err(errRollback).
-				Ctx(ctx).
-				Fields(logFields).
-				Msg("[GuestService][Create][Rollback] failed to rollback transaction")
-		}
-
 		return nil, err
 	}
 
 	responseDTO = dtos.NewGuestResponseDTO(entity)
 	logFields["responseDTO"] = responseDTO
 
-	err = s.deleteEntityCaches(ctx)
-	if err != nil {
-		log.Err(err).
-			Ctx(ctx).
-			Fields(logFields).
-			Msg("[GuestService][Create][deleteEntityCaches] failed to delete caches")
-		err = nil
-	}
-
-	if s.cfg.Guest.Event.Created.Enable {
-		logFields["eventTopic"] = s.cfg.Guest.Event.Created.Topic
-
-		eventEntity = entities.NewEventEntity(s.cfg.Guest.Event.Created.Topic, entities.NewGuestEventEntity(entity))
-		logFields["eventEntity"] = eventEntity
-
-		err = s.guestEventProducerRepository.Publish(
-			ctx,
-			s.cfg.Guest.Event.Created.Topic,
-			eventEntity,
-		)
-		if err != nil {
-			log.Err(err).
-				Ctx(ctx).
-				Fields(logFields).
-				Msg("[GuestService][Create][Publish] failed to publish message")
-			err = nil
-		}
-	}
+	s.tryDeleteEntityCaches(ctx, logFields, "Create")
+	s.publishSingleEvent(ctx, logFields, s.cfg.Guest.Event.Created.Enable, s.cfg.Guest.Event.Created.Topic, entity, "Create")
 
 	return responseDTO, nil
 }
 
 func (s *GuestService) DeleteByID(ctx context.Context, requestDTO *dtos.DeleteGuestByIDRequestDTO) error {
 	var (
-		span        trace.Span
-		logFields   map[string]interface{}
-		filter      *goqube.Filter
-		entity      *entities.GuestEntity
-		logLevel    zerolog.Level
-		tx          repositories.IBoilerplateDatabaseTransaction
-		eventEntity *entities.EventEntity[entities.GuestEventEntity]
-		err         error
+		span      trace.Span
+		logFields map[string]interface{}
+		filter    *goqube.Filter
+		entity    *entities.GuestEntity
+		logLevel  zerolog.Level
+		err       error
 	)
 
 	ctx, span = tracer.Start(ctx, "[GuestService][DeleteByID]")
@@ -250,29 +360,10 @@ func (s *GuestService) DeleteByID(ctx context.Context, requestDTO *dtos.DeleteGu
 		return err
 	}
 
-	filter = &goqube.Filter{
-		Logic: goqube.LogicAnd,
-		Filters: []goqube.Filter{
-			{
-				Field:    goqube.Field{Column: entities.GuestEntityDatabaseFieldID},
-				Operator: goqube.OperatorEqual,
-				Value:    goqube.FilterValue{Value: requestDTO.ID},
-			},
-			{
-				Field:    goqube.Field{Column: entities.GuestEntityDatabaseFieldDeletedAt},
-				Operator: goqube.OperatorIsNull,
-				Value:    goqube.FilterValue{Value: nil},
-			},
-		},
-	}
+	filter = s.buildActiveEntityFilterByID(requestDTO.ID)
 	logFields["filter"] = filter
 
-	entity, err = s.guestRepository.FindOne(
-		ctx,
-		filter,
-		nil,
-		false,
-	)
+	entity, err = s.guestRepository.FindOne(ctx, filter, nil, false)
 	if err != nil {
 		logLevel = zerolog.WarnLevel
 		if gocerr.GetErrorCode(err) >= http.StatusInternalServerError {
@@ -290,84 +381,15 @@ func (s *GuestService) DeleteByID(ctx context.Context, requestDTO *dtos.DeleteGu
 	entity = entity.MarkAsDeleted(requestDTO.DeletedBy)
 	logFields["entity"] = entity
 
-	tx, err = s.guestRepository.BeginTransaction(ctx)
+	err = s.withTransaction(ctx, logFields, "DeleteByID", func(tx repositories.IBoilerplateDatabaseTransaction) error {
+		return s.guestRepository.WithTransaction(tx).Update(ctx, entity, filter)
+	})
 	if err != nil {
-		log.Err(err).
-			Ctx(ctx).
-			Fields(logFields).
-			Msg("[GuestService][DeleteByID][BeginTransaction] failed to begin transaction")
 		return err
 	}
 
-	err = s.guestRepository.WithTransaction(tx).
-		Update(
-			ctx,
-			entity,
-			filter,
-		)
-	if err != nil {
-		log.Err(err).
-			Ctx(ctx).
-			Fields(logFields).
-			Msg("[GuestService][DeleteByID][WithTransaction][Update] failed to update entity")
-
-		var errRollback error = tx.Rollback()
-		if errRollback != nil {
-			log.Err(errRollback).
-				Ctx(ctx).
-				Fields(logFields).
-				Msg("[GuestService][DeleteByID][Rollback] failed to rollback transaction")
-		}
-
-		return err
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		log.Err(err).
-			Ctx(ctx).
-			Fields(logFields).
-			Msg("[GuestService][DeleteByID][Update] failed to commit transaction")
-
-		var errRollback error = tx.Rollback()
-		if errRollback != nil {
-			log.Err(errRollback).
-				Ctx(ctx).
-				Fields(logFields).
-				Msg("[GuestService][DeleteByID][Rollback] failed to rollback transaction")
-		}
-
-		return err
-	}
-
-	err = s.deleteEntityCaches(ctx)
-	if err != nil {
-		log.Err(err).
-			Ctx(ctx).
-			Fields(logFields).
-			Msg("[GuestService][DeleteByID][deleteEntityCaches] failed to delete caches")
-		err = nil
-	}
-
-	if s.cfg.Guest.Event.Deleted.Enable {
-		logFields["eventTopic"] = s.cfg.Guest.Event.Deleted.Topic
-
-		eventEntity = entities.NewEventEntity(s.cfg.Guest.Event.Deleted.Topic, entities.NewGuestEventEntity(entity))
-		logFields["eventEntity"] = eventEntity
-
-		err = s.guestEventProducerRepository.Publish(
-			ctx,
-			s.cfg.Guest.Event.Deleted.Topic,
-			eventEntity,
-		)
-		if err != nil {
-			log.Err(err).
-				Ctx(ctx).
-				Fields(logFields).
-				Msg("[GuestService][DeleteByID][Publish] failed to publish message")
-			err = nil
-		}
-	}
+	s.tryDeleteEntityCaches(ctx, logFields, "DeleteByID")
+	s.publishSingleEvent(ctx, logFields, s.cfg.Guest.Event.Deleted.Enable, s.cfg.Guest.Event.Deleted.Topic, entity, "DeleteByID")
 
 	return nil
 }
@@ -951,28 +973,10 @@ func (s *GuestService) FindByID(ctx context.Context, requestDTO *dtos.FindGuestB
 	cacheKey = fmt.Sprintf(s.cfg.Guest.Cache.Keyf, requestDTO.ID)
 	logFields["cacheKey"] = cacheKey
 
-	filter = &goqube.Filter{
-		Logic: goqube.LogicAnd,
-		Filters: []goqube.Filter{
-			{
-				Field:    goqube.Field{Column: entities.GuestEntityDatabaseFieldID},
-				Operator: goqube.OperatorEqual,
-				Value:    goqube.FilterValue{Value: requestDTO.ID},
-			},
-			{
-				Field:    goqube.Field{Column: entities.GuestEntityDatabaseFieldDeletedAt},
-				Operator: goqube.OperatorIsNull,
-				Value:    goqube.FilterValue{Value: nil},
-			},
-		},
-	}
+	filter = s.buildActiveEntityFilterByID(requestDTO.ID)
 	logFields["filter"] = filter
 
-	entity, err = s.findEntityByID(
-		ctx,
-		cacheKey,
-		filter,
-	)
+	entity, err = s.findEntityByID(ctx, cacheKey, filter)
 	if err != nil {
 		log.Err(err).
 			Ctx(ctx).
@@ -993,9 +997,7 @@ func (s *GuestService) UpdateByID(ctx context.Context, requestDTO *dtos.UpdateGu
 		filter      *goqube.Filter
 		entity      *entities.GuestEntity
 		logLevel    zerolog.Level
-		tx          repositories.IBoilerplateDatabaseTransaction
 		responseDTO *dtos.GuestResponseDTO
-		eventEntity *entities.EventEntity[entities.GuestEventEntity]
 		err         error
 	)
 
@@ -1020,29 +1022,10 @@ func (s *GuestService) UpdateByID(ctx context.Context, requestDTO *dtos.UpdateGu
 		return nil, err
 	}
 
-	filter = &goqube.Filter{
-		Logic: goqube.LogicAnd,
-		Filters: []goqube.Filter{
-			{
-				Field:    goqube.Field{Column: entities.GuestEntityDatabaseFieldID},
-				Operator: goqube.OperatorEqual,
-				Value:    goqube.FilterValue{Value: requestDTO.ID},
-			},
-			{
-				Field:    goqube.Field{Column: entities.GuestEntityDatabaseFieldDeletedAt},
-				Operator: goqube.OperatorIsNull,
-				Value:    goqube.FilterValue{Value: nil},
-			},
-		},
-	}
+	filter = s.buildActiveEntityFilterByID(requestDTO.ID)
 	logFields["filter"] = filter
 
-	entity, err = s.guestRepository.FindOne(
-		ctx,
-		filter,
-		nil,
-		false,
-	)
+	entity, err = s.guestRepository.FindOne(ctx, filter, nil, false)
 	if err != nil {
 		logLevel = zerolog.WarnLevel
 		if gocerr.GetErrorCode(err) >= http.StatusInternalServerError {
@@ -1060,87 +1043,18 @@ func (s *GuestService) UpdateByID(ctx context.Context, requestDTO *dtos.UpdateGu
 	entity = requestDTO.ToExistingEntity(entity)
 	logFields["entity"] = entity
 
-	tx, err = s.guestRepository.BeginTransaction(ctx)
+	err = s.withTransaction(ctx, logFields, "UpdateByID", func(tx repositories.IBoilerplateDatabaseTransaction) error {
+		return s.guestRepository.WithTransaction(tx).Update(ctx, entity, filter)
+	})
 	if err != nil {
-		log.Err(err).
-			Ctx(ctx).
-			Fields(logFields).
-			Msg("[GuestService][UpdateByID][BeginTransaction] failed to begin transaction")
-		return nil, err
-	}
-
-	err = s.guestRepository.WithTransaction(tx).
-		Update(
-			ctx,
-			entity,
-			filter,
-		)
-	if err != nil {
-		log.Err(err).
-			Ctx(ctx).
-			Fields(logFields).
-			Msg("[GuestService][UpdateByID][WithTransaction][Update] failed to update entity")
-
-		var errRollback error = tx.Rollback()
-		if errRollback != nil {
-			log.Err(errRollback).
-				Ctx(ctx).
-				Fields(logFields).
-				Msg("[GuestService][UpdateByID][Rollback] failed to rollback transaction")
-		}
-
-		return nil, err
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		log.Err(err).
-			Ctx(ctx).
-			Fields(logFields).
-			Msg("[GuestService][UpdateByID][Update] failed to commit transaction")
-
-		var errRollback error = tx.Rollback()
-		if errRollback != nil {
-			log.Err(errRollback).
-				Ctx(ctx).
-				Fields(logFields).
-				Msg("[GuestService][UpdateByID][Rollback] failed to rollback transaction")
-		}
-
 		return nil, err
 	}
 
 	responseDTO = dtos.NewGuestResponseDTO(entity)
 	logFields["responseDTO"] = responseDTO
 
-	err = s.deleteEntityCaches(ctx)
-	if err != nil {
-		log.Err(err).
-			Ctx(ctx).
-			Fields(logFields).
-			Msg("[GuestService][UpdateByID][deleteEntityCaches] failed to delete caches")
-		err = nil
-	}
-
-	if s.cfg.Guest.Event.Updated.Enable {
-		logFields["eventTopic"] = s.cfg.Guest.Event.Updated.Topic
-
-		eventEntity = entities.NewEventEntity(s.cfg.Guest.Event.Updated.Topic, entities.NewGuestEventEntity(entity))
-		logFields["eventEntity"] = eventEntity
-
-		err = s.guestEventProducerRepository.Publish(
-			ctx,
-			s.cfg.Guest.Event.Updated.Topic,
-			eventEntity,
-		)
-		if err != nil {
-			log.Err(err).
-				Ctx(ctx).
-				Fields(logFields).
-				Msg("[GuestService][UpdateByID][Publish] failed to publish message")
-			err = nil
-		}
-	}
+	s.tryDeleteEntityCaches(ctx, logFields, "UpdateByID")
+	s.publishSingleEvent(ctx, logFields, s.cfg.Guest.Event.Updated.Enable, s.cfg.Guest.Event.Updated.Topic, entity, "UpdateByID")
 
 	return responseDTO, nil
 }
@@ -1180,4 +1094,214 @@ func (s *GuestService) ProcessEvent(ctx context.Context, requestDTO *dtos.GuestE
 	responseDTO = dtos.NewGuestEventResponseDTO(entity)
 
 	return responseDTO, nil
+}
+
+func (s *GuestService) BulkCreate(ctx context.Context, requestDTO *dtos.BulkCreateGuestsRequestDTO) (*dtos.BulkCreateGuestsResponseDTO, error) {
+	var (
+		span          trace.Span
+		logFields     map[string]interface{}
+		newEntities   []entities.GuestEntity
+		responseDTO   *dtos.BulkCreateGuestsResponseDTO
+		err           error
+	)
+
+	ctx, span = tracer.Start(ctx, "[GuestService][BulkCreate]")
+	defer span.End()
+
+	if requestDTO == nil {
+		return nil, gocerr.New(http.StatusBadRequest, "requestDTO is nil")
+	}
+
+	logFields = map[string]interface{}{
+		"requestDTO": requestDTO,
+	}
+
+	err = requestDTO.Validate()
+	if err != nil {
+		log.Warn().
+			Ctx(ctx).
+			Err(err).
+			Fields(logFields).
+			Msg("[GuestService][BulkCreate][Validate] failed to validate dto")
+		return nil, err
+	}
+
+	newEntities = requestDTO.ToEntities()
+	logFields["newEntities"] = newEntities
+
+	err = s.withTransaction(ctx, logFields, "BulkCreate", func(tx repositories.IBoilerplateDatabaseTransaction) error {
+		return s.guestRepository.WithTransaction(tx).BulkCreate(ctx, newEntities)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	responseDTO = dtos.NewBulkCreateGuestsResponseDTO(newEntities)
+	logFields["responseDTO"] = responseDTO
+
+	s.tryDeleteEntityCaches(ctx, logFields, "BulkCreate")
+	s.publishBulkEvent(ctx, logFields, s.cfg.Guest.Event.BulkCreated.Enable, s.cfg.Guest.Event.BulkCreated.Topic, newEntities, "BulkCreate")
+
+	return responseDTO, nil
+}
+
+func (s *GuestService) BulkUpdate(ctx context.Context, requestDTO *dtos.BulkUpdateGuestsRequestDTO) (*dtos.BulkUpdateGuestsResponseDTO, error) {
+	var (
+		span                trace.Span
+		logFields           map[string]interface{}
+		entityIDs           []string
+		filter              *goqube.Filter
+		existingEntities    []entities.GuestEntity
+		existingEntitiesMap map[string]*entities.GuestEntity
+		existingEntity      *entities.GuestEntity
+		ok                  bool
+		updatedEntity       *entities.GuestEntity
+		updatedEntities     []entities.GuestEntity
+		responseDTO         *dtos.BulkUpdateGuestsResponseDTO
+		err                 error
+	)
+
+	ctx, span = tracer.Start(ctx, "[GuestService][BulkUpdate]")
+	defer span.End()
+
+	if requestDTO == nil {
+		return nil, gocerr.New(http.StatusBadRequest, "requestDTO is nil")
+	}
+
+	logFields = map[string]interface{}{
+		"requestDTO": requestDTO,
+	}
+
+	err = requestDTO.Validate()
+	if err != nil {
+		log.Warn().
+			Ctx(ctx).
+			Err(err).
+			Fields(logFields).
+			Msg("[GuestService][BulkUpdate][Validate] failed to validate dto")
+		return nil, err
+	}
+
+	entityIDs = requestDTO.ToIDs()
+
+	filter = s.buildActiveEntityFilterByIDs(entityIDs)
+	logFields["filter"] = filter
+
+	existingEntities, err = s.guestRepository.FindAll(ctx, filter, nil, uint64(len(requestDTO.Items)), 0, false)
+	if err != nil {
+		log.Err(err).
+			Ctx(ctx).
+			Fields(logFields).
+			Msg("[GuestService][BulkUpdate][FindAll] failed to find entities")
+		return nil, err
+	}
+
+	if len(existingEntities) <= 0 {
+		return nil, gocerr.New(http.StatusNotFound, "entities not found")
+	}
+	logFields["existingEntities"] = existingEntities
+
+	existingEntitiesMap = map[string]*entities.GuestEntity{}
+	for i := range existingEntities {
+		existingEntitiesMap[existingEntities[i].ID.String()] = &existingEntities[i]
+	}
+	logFields["existingEntitiesMap"] = existingEntitiesMap
+
+	for i := range requestDTO.Items {
+		var item = &requestDTO.Items[i]
+
+		existingEntity, ok = existingEntitiesMap[item.ID]
+		if !ok {
+			err = gocerr.New(http.StatusNotFound, "entity not found for id: "+item.ID)
+			return nil, err
+		}
+
+		updatedEntity = item.ToExistingEntity(existingEntity)
+		updatedEntities = append(updatedEntities, *updatedEntity)
+	}
+	logFields["updatedEntities"] = updatedEntities
+
+	err = s.withTransaction(ctx, logFields, "BulkUpdate", func(tx repositories.IBoilerplateDatabaseTransaction) error {
+		return s.guestRepository.WithTransaction(tx).BulkUpdate(ctx, updatedEntities)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	responseDTO = dtos.NewBulkUpdateGuestsResponseDTO(updatedEntities)
+	logFields["responseDTO"] = responseDTO
+
+	s.tryDeleteEntityCaches(ctx, logFields, "BulkUpdate")
+	s.publishBulkEvent(ctx, logFields, s.cfg.Guest.Event.BulkUpdated.Enable, s.cfg.Guest.Event.BulkUpdated.Topic, updatedEntities, "BulkUpdate")
+
+	return responseDTO, nil
+}
+
+func (s *GuestService) BulkDelete(ctx context.Context, requestDTO *dtos.BulkDeleteGuestsRequestDTO) error {
+	var (
+		span             trace.Span
+		logFields        map[string]interface{}
+		entityIDs        []string
+		filter           *goqube.Filter
+		existingEntities []entities.GuestEntity
+		deletedEntities  []entities.GuestEntity
+		err              error
+	)
+
+	ctx, span = tracer.Start(ctx, "[GuestService][BulkDelete]")
+	defer span.End()
+
+	if requestDTO == nil {
+		return gocerr.New(http.StatusBadRequest, "requestDTO is nil")
+	}
+
+	logFields = map[string]interface{}{
+		"requestDTO": requestDTO,
+	}
+
+	err = requestDTO.Validate()
+	if err != nil {
+		log.Warn().
+			Ctx(ctx).
+			Err(err).
+			Fields(logFields).
+			Msg("[GuestService][BulkDelete][Validate] failed to validate dto")
+		return err
+	}
+
+	entityIDs = requestDTO.ToIDs()
+
+	filter = s.buildActiveEntityFilterByIDs(entityIDs)
+	logFields["filter"] = filter
+
+	existingEntities, err = s.guestRepository.FindAll(ctx, filter, nil, uint64(len(requestDTO.IDs)), 0, false)
+	if err != nil {
+		log.Err(err).
+			Ctx(ctx).
+			Fields(logFields).
+			Msg("[GuestService][BulkDelete][FindAll] failed to find entities")
+		return err
+	}
+
+	if len(existingEntities) <= 0 {
+		return gocerr.New(http.StatusNotFound, "entities not found")
+	}
+	logFields["existingEntities"] = existingEntities
+
+	for i := range existingEntities {
+		deletedEntities = append(deletedEntities, *existingEntities[i].MarkAsDeleted(requestDTO.DeletedBy))
+	}
+	logFields["deletedEntities"] = deletedEntities
+
+	err = s.withTransaction(ctx, logFields, "BulkDelete", func(tx repositories.IBoilerplateDatabaseTransaction) error {
+		return s.guestRepository.WithTransaction(tx).BulkUpdate(ctx, deletedEntities)
+	})
+	if err != nil {
+		return err
+	}
+
+	s.tryDeleteEntityCaches(ctx, logFields, "BulkDelete")
+	s.publishBulkEvent(ctx, logFields, s.cfg.Guest.Event.BulkDeleted.Enable, s.cfg.Guest.Event.BulkDeleted.Topic, deletedEntities, "BulkDelete")
+
+	return nil
 }

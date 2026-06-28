@@ -31,6 +31,19 @@ type IEventProducerRepository[TEntity interface{}] interface {
 		delay time.Duration,
 		message *entities.EventEntity[TEntity],
 	) error
+
+	PublishBulk(
+		ctx context.Context,
+		topic string,
+		message *entities.EventEntity[[]TEntity],
+	) error
+
+	PublishBulkWithDelay(
+		ctx context.Context,
+		topic string,
+		delay time.Duration,
+		message *entities.EventEntity[[]TEntity],
+	) error
 }
 
 type EventProducerRepository[TEntity interface{}] struct {
@@ -128,6 +141,98 @@ func (r *EventProducerRepository[TEntity]) PublishWithDelay(
 			Ctx(ctx).
 			Fields(logFields).
 			Msg("[EventProducerRepository][PublishWithDelay][DeferredPublish] failed to publish message")
+		err = gocerr.New(http.StatusInternalServerError, err.Error())
+		return err
+	}
+
+	return nil
+}
+
+func (r *EventProducerRepository[TEntity]) PublishBulk(
+	ctx context.Context,
+	topic string,
+	message *entities.EventEntity[[]TEntity],
+) error {
+	var (
+		span      trace.Span
+		logFields map[string]interface{}
+		bMessage  []byte
+		err       error
+	)
+
+	ctx, span = tracer.Start(ctx, "[EventProducerRepository][PublishBulk]")
+	defer span.End()
+
+	ctx, message = message.InjectTracerPropagator(ctx)
+
+	logFields = map[string]interface{}{
+		"topic":   topic,
+		"message": message,
+	}
+
+	bMessage, err = json.Marshal(message)
+	if err != nil {
+		log.Err(err).
+			Ctx(ctx).
+			Fields(logFields).
+			Msg("[EventProducerRepository][PublishBulk][Marshal] failed to marshal message")
+		err = gocerr.New(http.StatusInternalServerError, err.Error())
+		return err
+	}
+
+	err = r.eventProducer.NSQProducer.Publish(topic, bMessage)
+	if err != nil {
+		log.Err(err).
+			Ctx(ctx).
+			Fields(logFields).
+			Msg("[EventProducerRepository][PublishBulk][Publish] failed to publish message")
+		err = gocerr.New(http.StatusInternalServerError, err.Error())
+		return err
+	}
+
+	return nil
+}
+
+func (r *EventProducerRepository[TEntity]) PublishBulkWithDelay(
+	ctx context.Context,
+	topic string,
+	delay time.Duration,
+	message *entities.EventEntity[[]TEntity],
+) error {
+	var (
+		span      trace.Span
+		logFields map[string]interface{}
+		bMessage  []byte
+		err       error
+	)
+
+	ctx, span = tracer.Start(ctx, "[EventProducerRepository][PublishBulkWithDelay]")
+	defer span.End()
+
+	ctx, message = message.InjectTracerPropagator(ctx)
+
+	logFields = map[string]interface{}{
+		"topic":   topic,
+		"delay":   delay,
+		"message": message,
+	}
+
+	bMessage, err = json.Marshal(message)
+	if err != nil {
+		log.Err(err).
+			Ctx(ctx).
+			Fields(logFields).
+			Msg("[EventProducerRepository][PublishBulkWithDelay][Marshal] failed to marshal message")
+		err = gocerr.New(http.StatusInternalServerError, err.Error())
+		return err
+	}
+
+	err = r.eventProducer.NSQProducer.DeferredPublish(topic, delay, bMessage)
+	if err != nil {
+		log.Err(err).
+			Ctx(ctx).
+			Fields(logFields).
+			Msg("[EventProducerRepository][PublishBulkWithDelay][DeferredPublish] failed to publish message")
 		err = gocerr.New(http.StatusInternalServerError, err.Error())
 		return err
 	}
